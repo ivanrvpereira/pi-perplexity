@@ -34,7 +34,19 @@ export default function (pi: ExtensionAPI) {
           details: { toolCallId },
         });
 
-        const jwt = await authenticate();
+        const promptInput = async (label: string, placeholder: string): Promise<string | null | undefined> => {
+          if (!ctx?.ui?.input) {
+            return undefined;
+          }
+
+          return ctx.ui.input(label, placeholder);
+        };
+
+        const jwt = await authenticate({
+          signal,
+          promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
+          promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
+        });
 
         if (signal?.aborted) {
           return {
