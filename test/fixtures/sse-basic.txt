@@ -1,0 +1,6 @@
+data: {"status":"IN_PROGRESS",
+data: "text":"partial"}
+
+data: {"status":"COMPLETED","final":true,"text":"final answer","display_model":"pplx_pro_upgraded","uuid":"req-basic","sources_list":[{"title":"Example","url":"https://example.com","snippet":"Example source","date":"2026-02-15T12:00:00.000Z"}]}
+
+data: [DONE]

@@ -1,0 +1,7 @@
+data: {"status":"IN_PROGRESS","blocks":[{"intended_usage":"markdown_block","markdown_block":{"chunks":["Hello ","wor"],"chunk_starting_offset":0}}]}
+
+data: {"status":"IN_PROGRESS","blocks":[{"intended_usage":"markdown_block","markdown_block":{"chunks":["world"],"chunk_starting_offset":1}}],"sources_list":[{"title":"Source A","url":"https://a.example","snippet":"A","date":"2026-02-15T10:00:00.000Z"}]}
+
+data: {"status":"COMPLETED","final":true,"blocks":[{"intended_usage":"web_results","web_result_block":{"web_results":[{"name":"Source B","url":"https://b.example","snippet":"B","timestamp":"2026-02-14T10:00:00.000Z"}]}}],"display_model":"pplx_pro_upgraded","uuid":"req-incremental"}
+
+data: [DONE]
