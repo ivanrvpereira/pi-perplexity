@@ -1,14 +1,27 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import { mergeEvent, readSseEvents } from "./stream.js";
 import type { SearchResult, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
 const PERPLEXITY_USER_AGENT = "Perplexity/641 CFNetwork/1568 Darwin/25.2.0";
+const MAX_BUN_STDOUT_BYTES = 50 * 1024 * 1024;
+const CLOUDFLARE_HINTS = ["just a moment", "cloudflare", "cf-chl", "cf-ray"];
+
+const execFileAsync = promisify(execFile);
 
 export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
   limit?: number;
+}
+
+interface BunFetchResult {
+  status: number;
+  contentType: string | null;
+  bodyText: string;
 }
 
 function normalizeUrl(url: string): string {
@@ -127,8 +140,45 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
   };
 }
 
-function mapHttpError(status: number): SearchError {
+function buildRequestHeaders(jwt: string, requestId: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${jwt}`,
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+    Origin: "https://www.perplexity.ai",
+    Referer: "https://www.perplexity.ai/",
+    "User-Agent": PERPLEXITY_USER_AGENT,
+    "X-App-ApiClient": "default",
+    "X-App-ApiVersion": "2.18",
+    "X-Perplexity-Request-Reason": "submit",
+    "X-Request-ID": requestId,
+  };
+}
+
+function isCloudflareChallenge(status: number, contentType: string | null, bodyText: string): boolean {
+  if (status !== 403) {
+    return false;
+  }
+
+  const contentTypeLower = (contentType ?? "").toLowerCase();
+  const bodyLower = bodyText.toLowerCase();
+
+  if (!contentTypeLower.includes("text/html")) {
+    return false;
+  }
+
+  return CLOUDFLARE_HINTS.some((hint) => bodyLower.includes(hint));
+}
+
+function mapHttpError(status: number, bodyText = "", contentType: string | null = null): SearchError {
   if (status === 401 || status === 403) {
+    if (isCloudflareChallenge(status, contentType, bodyText)) {
+      return new SearchError(
+        "NETWORK",
+        "Perplexity request was blocked by Cloudflare challenge in this runtime. Retry via Bun runtime fallback or desktop app token path.",
+      );
+    }
+
     return new SearchError(
       "AUTH",
       "Perplexity rejected authentication (401/403). Sign in to Perplexity desktop app and retry.",
@@ -148,6 +198,100 @@ function mapHttpError(status: number): SearchError {
   );
 }
 
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(text);
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+async function fetchViaBunRuntime(
+  requestBody: Record<string, unknown>,
+  jwt: string,
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<BunFetchResult> {
+  const script = `
+const endpoint = process.env.PI_PPLX_ENDPOINT;
+const token = process.env.PI_PPLX_TOKEN;
+const body = JSON.parse(process.env.PI_PPLX_BODY || "{}");
+const requestId = process.env.PI_PPLX_REQUEST_ID || crypto.randomUUID();
+try {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: \`Bearer \${token}\`,
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      Origin: "https://www.perplexity.ai",
+      Referer: "https://www.perplexity.ai/",
+      "User-Agent": "${PERPLEXITY_USER_AGENT}",
+      "X-App-ApiClient": "default",
+      "X-App-ApiVersion": "2.18",
+      "X-Perplexity-Request-Reason": "submit",
+      "X-Request-ID": requestId,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  process.stdout.write(JSON.stringify({
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    bodyText: text,
+  }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({
+    status: 0,
+    contentType: null,
+    bodyText: String(error && error.message ? error.message : error),
+  }));
+}
+`;
+
+  const { stdout } = await execFileAsync(
+    "bun",
+    ["-e", script],
+    {
+      encoding: "utf8",
+      maxBuffer: MAX_BUN_STDOUT_BYTES,
+      signal,
+      env: {
+        ...process.env,
+        PI_PPLX_ENDPOINT: PERPLEXITY_ENDPOINT,
+        PI_PPLX_TOKEN: jwt,
+        PI_PPLX_BODY: JSON.stringify(requestBody),
+        PI_PPLX_REQUEST_ID: requestId,
+      },
+    },
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error("Bun fallback returned non-JSON output.");
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Bun fallback returned invalid payload.");
+  }
+
+  const result = parsed as Partial<BunFetchResult>;
+  if (typeof result.status !== "number" || typeof result.bodyText !== "string") {
+    throw new Error("Bun fallback response missing required fields.");
+  }
+
+  return {
+    status: result.status,
+    contentType: typeof result.contentType === "string" ? result.contentType : null,
+    bodyText: result.bodyText,
+  };
+}
+
 /** Execute a Perplexity search: POST SSE, stream/merge events, extract answer + sources. Throws SearchError on failure. */
 export async function searchPerplexity(
   params: SearchParams,
@@ -155,24 +299,15 @@ export async function searchPerplexity(
   signal?: AbortSignal,
 ): Promise<SearchResult> {
   const requestId = crypto.randomUUID();
+  const requestBody = buildRequestBody(params);
+  const requestHeaders = buildRequestHeaders(jwt, requestId);
 
   let response: Response;
   try {
     response = await fetch(PERPLEXITY_ENDPOINT, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        Origin: "https://www.perplexity.ai",
-        Referer: "https://www.perplexity.ai/",
-        "User-Agent": PERPLEXITY_USER_AGENT,
-        "X-App-ApiClient": "default",
-        "X-App-ApiVersion": "2.18",
-        "X-Perplexity-Request-Reason": "submit",
-        "X-Request-ID": requestId,
-      },
-      body: JSON.stringify(buildRequestBody(params)),
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
       signal,
     });
   } catch (error) {
@@ -186,18 +321,53 @@ export async function searchPerplexity(
     );
   }
 
+  let eventStream: ReadableStream<Uint8Array> | null = null;
+
   if (!response.ok) {
-    throw mapHttpError(response.status);
+    let bodyText = "";
+    try {
+      bodyText = await response.text();
+    } catch {
+      bodyText = "";
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    if (isCloudflareChallenge(response.status, contentType, bodyText)) {
+      let bunResult: BunFetchResult;
+      try {
+        bunResult = await fetchViaBunRuntime(requestBody, jwt, requestId, signal);
+      } catch (error) {
+        throw new SearchError(
+          "NETWORK",
+          `Perplexity request hit Cloudflare challenge and Bun fallback failed: ${(error as Error).message || "unknown error"}`,
+        );
+      }
+
+      if (bunResult.status !== 200) {
+        throw mapHttpError(bunResult.status, bunResult.bodyText, bunResult.contentType);
+      }
+
+      eventStream = streamFromText(bunResult.bodyText);
+    } else {
+      throw mapHttpError(response.status, bodyText, contentType);
+    }
+  } else {
+    if (!response.body) {
+      throw new SearchError("STREAM", "Perplexity returned an empty stream body.");
+    }
+
+    eventStream = response.body;
   }
 
-  if (!response.body) {
-    throw new SearchError("STREAM", "Perplexity returned an empty stream body.");
+  if (!eventStream) {
+    throw new SearchError("STREAM", "Perplexity returned no readable stream.");
   }
 
   let snapshot: StreamEvent = {};
 
   try {
-    for await (const event of readSseEvents(response.body, signal)) {
+    for await (const event of readSseEvents(eventStream, signal)) {
       snapshot = mergeEvent(snapshot, event);
       if (event.final || event.status === "COMPLETED") {
         break;

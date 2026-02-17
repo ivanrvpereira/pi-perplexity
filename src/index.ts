@@ -2,13 +2,18 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
+import { registerPerplexityCommands } from "./commands/login.js";
+
 import { authenticate } from "./auth/login.js";
 import { clearToken } from "./auth/storage.js";
 import { formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
+import { renderPerplexityCall } from "./render/call.js";
+import { renderPerplexityResult } from "./render/result.js";
 import { AuthError, SearchError } from "./search/types.js";
 
 export default function (pi: ExtensionAPI) {
+  registerPerplexityCommands(pi);
   pi.registerTool({
     name: "perplexity_search",
     label: "Perplexity Search",
@@ -24,6 +29,8 @@ export default function (pi: ExtensionAPI) {
         Type.Number({ description: "Max sources to return", minimum: 1, maximum: 50 }),
       ),
     }),
+    renderCall: renderPerplexityCall,
+    renderResult: renderPerplexityResult,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const start = Date.now();
       let sourceCount = 0;

@@ -13,6 +13,10 @@ function createJwt(expiryMs: number): string {
   return `${header}.${payload}.signature`;
 }
 
+function createOpaqueToken(): string {
+  return "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0.part2.part3.part4.part5";
+}
+
 async function importLoginModule() {
   return import(`../../src/auth/login.ts?test=${crypto.randomUUID()}`);
 }
@@ -90,6 +94,31 @@ describe("auth/login", () => {
     expect(token).toBe(desktopToken);
   });
 
+  test("extractFromDesktopApp returns opaque token from defaults output", async () => {
+    const desktopToken = createOpaqueToken();
+    const execFileMock = mock((...args: unknown[]) => {
+      const callback = args[args.length - 1] as (
+        error: Error | null,
+        stdout?: string,
+        stderr?: string,
+      ) => void;
+      callback(null, `${desktopToken}\n`, "");
+    }) as unknown as typeof import("node:child_process").execFile;
+
+    (execFileMock as unknown as Record<symbol, unknown>)[
+      Symbol.for("nodejs.util.promisify.custom")
+    ] = async () => ({ stdout: `${desktopToken}\n`, stderr: "" });
+
+    mock.module("node:child_process", () => ({
+      execFile: execFileMock,
+    }));
+
+    const { extractFromDesktopApp } = await importLoginModule();
+
+    const token = await extractFromDesktopApp();
+    expect(token).toBe(desktopToken);
+  });
+
   test("authenticate returns non-expired cached token without desktop or OTP calls", async () => {
     const cachedToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
     const loadTokenMock = mock(async () => ({
@@ -133,7 +162,7 @@ describe("auth/login", () => {
   test("authenticate uses OTP fallback when desktop borrowing is disabled", async () => {
     process.env.PI_AUTH_NO_BORROW = "1";
 
-    const otpToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    const otpToken = createOpaqueToken();
     const loadTokenMock = mock(async () => null);
     const saveTokenMock = mock(async (_token: StoredToken) => undefined);
     const clearTokenMock = mock(async () => undefined);
@@ -203,6 +232,133 @@ describe("auth/login", () => {
       csrfToken: "csrf-token",
     });
 
+    expect(clearTokenMock).toHaveBeenCalledTimes(0);
+  });
+
+  test("authenticate accepts OTP token from session cookie when body has no token", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+
+    const otpToken = createOpaqueToken();
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.endsWith("/csrf")) {
+        return new Response(JSON.stringify({ csrfToken: "csrf-token" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/signin-email")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/signin-otp")) {
+        return new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "set-cookie": `__Secure-next-auth.session-token=${encodeURIComponent(otpToken)}; Path=/; HttpOnly`,
+          },
+        });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate({
+      promptForEmail: async () => "user@example.com",
+      promptForOtp: async () => "123456",
+    });
+
+    expect(token).toBe(otpToken);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("authenticate falls back to /session when OTP body has no token", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+
+    const otpToken = createOpaqueToken();
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const fetchMock = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.endsWith("/csrf")) {
+        return new Response(JSON.stringify({ csrfToken: "csrf-token" }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "set-cookie": "next-auth.csrf-token=csrf-cookie; Path=/",
+          },
+        });
+      }
+
+      if (url.endsWith("/signin-email")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/signin-otp")) {
+        return new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/session")) {
+        const cookieHeader = new Headers(init?.headers).get("Cookie") ?? "";
+        expect(cookieHeader).toContain("next-auth.csrf-token=csrf-cookie");
+
+        return new Response(JSON.stringify({ token: otpToken }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate({
+      promptForEmail: async () => "user@example.com",
+      promptForOtp: async () => "123456",
+    });
+
+    expect(token).toBe(otpToken);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
     expect(clearTokenMock).toHaveBeenCalledTimes(0);
   });
 
