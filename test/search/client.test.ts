@@ -3,8 +3,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { searchPerplexity } from "../../src/search/client.js";
 import { SearchError } from "../../src/search/types.js";
 
-const ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
-
 function createSseResponse(events: Array<Record<string, unknown>>, status = 200): Response {
   const streamText = [
     ...events.map((event) => `data: ${JSON.stringify(event)}\n\n`),
@@ -13,9 +11,7 @@ function createSseResponse(events: Array<Record<string, unknown>>, status = 200)
 
   return new Response(streamText, {
     status,
-    headers: {
-      "content-type": "text/event-stream",
-    },
+    headers: { "content-type": "text/event-stream" },
   });
 }
 
@@ -39,22 +35,12 @@ describe("searchPerplexity", () => {
           status: "COMPLETED",
           final: true,
           blocks: [
-            {
-              intended_usage: "markdown_block",
-              markdown_block: {
-                answer: "answer text",
-              },
-            },
+            { intended_usage: "markdown_block", markdown_block: { answer: "answer text" } },
             {
               intended_usage: "web_results",
               web_result_block: {
                 web_results: [
-                  {
-                    name: "Source",
-                    url: "https://example.com",
-                    snippet: "snippet",
-                    timestamp: "2026-02-16T10:00:00.000Z",
-                  },
+                  { name: "Source", url: "https://example.com", snippet: "snippet", timestamp: "2026-02-16T10:00:00.000Z" },
                 ],
               },
             },
@@ -70,7 +56,7 @@ describe("searchPerplexity", () => {
       controller.signal,
     );
 
-    expect(String(capturedUrl)).toBe(ENDPOINT);
+    expect(String(capturedUrl)).toBe("https://www.perplexity.ai/rest/sse/perplexity_ask");
     expect(capturedInit?.method).toBe("POST");
     expect(capturedInit?.signal).toBe(controller.signal);
 
@@ -133,12 +119,7 @@ describe("searchPerplexity", () => {
           status: "COMPLETED",
           final: true,
           blocks: [
-            {
-              intended_usage: "markdown_block",
-              markdown_block: {
-                answer: "answer text",
-              },
-            },
+            { intended_usage: "markdown_block", markdown_block: { answer: "answer text" } },
             {
               intended_usage: "web_results",
               web_result_block: {
@@ -168,14 +149,8 @@ describe("searchPerplexity", () => {
           final: true,
           text: "fallback text",
           blocks: [
-            {
-              intended_usage: "ask_text",
-              markdown_block: { answer: "ask text" },
-            },
-            {
-              intended_usage: "markdown_block",
-              markdown_block: { answer: "markdown answer" },
-            },
+            { intended_usage: "ask_text", markdown_block: { answer: "ask text" } },
+            { intended_usage: "markdown_block", markdown_block: { answer: "markdown answer" } },
           ],
           sources_list: [{ title: "S", url: "https://example.com" }],
         },
@@ -193,10 +168,7 @@ describe("searchPerplexity", () => {
           final: true,
           text: "fallback text",
           blocks: [
-            {
-              intended_usage: "ask_text",
-              markdown_block: { answer: "ask answer" },
-            },
+            { intended_usage: "ask_text", markdown_block: { answer: "ask answer" } },
           ],
           sources_list: [{ title: "S", url: "https://example.com" }],
         },
@@ -221,12 +193,7 @@ describe("searchPerplexity", () => {
 
   test("returns EMPTY error when response has no answer and no sources", async () => {
     globalThis.fetch = (async () =>
-      createSseResponse([
-        {
-          status: "COMPLETED",
-          final: true,
-        },
-      ])) as unknown as typeof fetch;
+      createSseResponse([{ status: "COMPLETED", final: true }])) as unknown as typeof fetch;
 
     let thrown: unknown;
     try {

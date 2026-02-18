@@ -11,6 +11,7 @@ import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
 import { renderPerplexityResult } from "./render/result.js";
 import { AuthError, SearchError } from "./search/types.js";
+import { errorMessage } from "./render/util.js";
 
 export default function (pi: ExtensionAPI) {
   registerPerplexityCommands(pi);
@@ -49,11 +50,13 @@ export default function (pi: ExtensionAPI) {
           return ctx.ui.input(label, placeholder);
         };
 
-        const jwt = await authenticate({
-          signal,
+        const authOptions: Parameters<typeof authenticate>[0] = {
           promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
           promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
-        });
+        };
+        if (signal) authOptions.signal = signal;
+
+        const jwt = await authenticate(authOptions);
 
         if (signal?.aborted) {
           return {
@@ -67,15 +70,13 @@ export default function (pi: ExtensionAPI) {
           details: { toolCallId },
         });
 
-        const result = await searchPerplexity(
-          {
-            query: params.query,
-            recency: params.recency,
-            limit: params.limit,
-          },
-          jwt,
-          signal,
-        );
+        const searchParams: Parameters<typeof searchPerplexity>[0] = {
+          query: params.query,
+        };
+        if (params.recency) searchParams.recency = params.recency;
+        if (typeof params.limit === "number") searchParams.limit = params.limit;
+
+        const result = await searchPerplexity(searchParams, jwt, signal);
 
         const formatted = formatForLLM(result, params.limit);
         sourceCount =
@@ -106,7 +107,6 @@ export default function (pi: ExtensionAPI) {
           if (error.code === "AUTH") {
             await clearToken().catch(() => undefined);
           }
-
           return {
             content: [{ type: "text", text: `Perplexity search failed: ${error.message}` }],
             details: { sourceCount, queryMs },
@@ -117,7 +117,7 @@ export default function (pi: ExtensionAPI) {
           content: [
             {
               type: "text",
-              text: `Perplexity search failed: ${(error as Error).message || "Unknown error"}`,
+              text: `Perplexity search failed: ${errorMessage(error)}`,
             },
           ],
           details: { sourceCount, queryMs },

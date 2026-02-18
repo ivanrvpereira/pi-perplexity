@@ -1,27 +1,110 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
 import { mergeEvent, readSseEvents } from "./stream.js";
 import type { SearchResult, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
+import { errorMessage } from "../render/util.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
 const PERPLEXITY_USER_AGENT = "Perplexity/641 CFNetwork/1568 Darwin/25.2.0";
-const MAX_BUN_STDOUT_BYTES = 50 * 1024 * 1024;
-const CLOUDFLARE_HINTS = ["just a moment", "cloudflare", "cf-chl", "cf-ray"];
 
-const execFileAsync = promisify(execFile);
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(text);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+const MAX_BUN_STDOUT = 50 * 1024 * 1024;
+
+/**
+ * Execute a Perplexity request via a Bun subprocess.
+ * Pi loads extensions under Node/jiti whose fetch gets Cloudflare-challenged.
+ * Bun's native fetch has a different TLS fingerprint that passes.
+ */
+async function fetchViaBunRuntime(
+  url: string,
+  headers: Record<string, string>,
+  body: string,
+  signal?: AbortSignal,
+): Promise<{ status: number; bodyText: string }> {
+  const script = `
+const c = JSON.parse(await Bun.stdin.text());
+try {
+  const r = await fetch(c.url, { method: "POST", headers: c.headers, body: c.body });
+  const t = await r.text();
+  process.stdout.write(JSON.stringify({ s: r.status, b: t }));
+} catch (e) {
+  process.stdout.write(JSON.stringify({ s: 0, b: String(e?.message ?? e) }));
+}
+`;
+
+  // Dynamic import: spawn is only needed under Node/jiti (not Bun),
+  // and Bun's node:child_process polyfill may not export it.
+  const { spawn } = await import("node:child_process");
+
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const child = spawn("bun", ["-e", script], {
+      stdio: ["pipe", "pipe", "ignore"],
+      env: { HOME: process.env.HOME, PATH: process.env.PATH },
+    });
+
+    if (signal) {
+      const onAbort = () => child.kill();
+      signal.addEventListener("abort", onAbort, { once: true });
+      child.on("close", () => signal.removeEventListener("abort", onAbort));
+    }
+
+    if (!child.stdin || !child.stdout) {
+      reject(new Error("Failed to open subprocess pipes"));
+      return;
+    }
+
+    child.stdin.write(JSON.stringify({ url, headers, body }));
+    child.stdin.end();
+
+    const chunks: Buffer[] = [];
+    let totalLen = 0;
+    child.stdout.on("data", (chunk: Buffer) => {
+      totalLen += chunk.length;
+      if (totalLen <= MAX_BUN_STDOUT) {
+        chunks.push(chunk);
+      }
+    });
+
+    child.on("close", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    child.on("error", reject);
+  });
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error(`Bun subprocess returned invalid output: ${stdout.slice(0, 200)}`);
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error("Bun subprocess response is not an object.");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.s !== "number" || typeof obj.b !== "string") {
+    throw new Error("Bun subprocess response missing required fields.");
+  }
+
+  return { status: obj.s, bodyText: obj.b };
+}
 
 export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
   limit?: number;
-}
-
-interface BunFetchResult {
-  status: number;
-  contentType: string | null;
-  bodyText: string;
 }
 
 function normalizeUrl(url: string): string {
@@ -104,12 +187,14 @@ function extractSources(event: StreamEvent): WebResult[] {
     return dedupeSourcesByUrl(blockSources);
   }
 
-  const fallbackSources: WebResult[] = (event.sources_list ?? []).map((source) => ({
-    name: source.title,
-    url: source.url,
-    snippet: source.snippet,
-    timestamp: source.date,
-  }));
+  const fallbackSources: WebResult[] = (event.sources_list ?? []).map((source) => {
+    const result: WebResult = {};
+    if (source.title !== undefined) result.name = source.title;
+    if (source.url !== undefined) result.url = source.url;
+    if (source.snippet !== undefined) result.snippet = source.snippet;
+    if (source.date !== undefined) result.timestamp = source.date;
+    return result;
+  });
 
   return dedupeSourcesByUrl(fallbackSources);
 }
@@ -155,30 +240,8 @@ function buildRequestHeaders(jwt: string, requestId: string): Record<string, str
   };
 }
 
-function isCloudflareChallenge(status: number, contentType: string | null, bodyText: string): boolean {
-  if (status !== 403) {
-    return false;
-  }
-
-  const contentTypeLower = (contentType ?? "").toLowerCase();
-  const bodyLower = bodyText.toLowerCase();
-
-  if (!contentTypeLower.includes("text/html")) {
-    return false;
-  }
-
-  return CLOUDFLARE_HINTS.some((hint) => bodyLower.includes(hint));
-}
-
-function mapHttpError(status: number, bodyText = "", contentType: string | null = null): SearchError {
+function mapHttpError(status: number): SearchError {
   if (status === 401 || status === 403) {
-    if (isCloudflareChallenge(status, contentType, bodyText)) {
-      return new SearchError(
-        "NETWORK",
-        "Perplexity request was blocked by Cloudflare challenge in this runtime. Retry via Bun runtime fallback or desktop app token path.",
-      );
-    }
-
     return new SearchError(
       "AUTH",
       "Perplexity rejected authentication (401/403). Sign in to Perplexity desktop app and retry.",
@@ -197,101 +260,6 @@ function mapHttpError(status: number, bodyText = "", contentType: string | null 
     `Perplexity request failed with HTTP ${status}. Check connectivity and retry.`,
   );
 }
-
-function streamFromText(text: string): ReadableStream<Uint8Array> {
-  const bytes = new TextEncoder().encode(text);
-
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
-}
-
-async function fetchViaBunRuntime(
-  requestBody: Record<string, unknown>,
-  jwt: string,
-  requestId: string,
-  signal?: AbortSignal,
-): Promise<BunFetchResult> {
-  const script = `
-const endpoint = process.env.PI_PPLX_ENDPOINT;
-const token = process.env.PI_PPLX_TOKEN;
-const body = JSON.parse(process.env.PI_PPLX_BODY || "{}");
-const requestId = process.env.PI_PPLX_REQUEST_ID || crypto.randomUUID();
-try {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: \`Bearer \${token}\`,
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-      Origin: "https://www.perplexity.ai",
-      Referer: "https://www.perplexity.ai/",
-      "User-Agent": "${PERPLEXITY_USER_AGENT}",
-      "X-App-ApiClient": "default",
-      "X-App-ApiVersion": "2.18",
-      "X-Perplexity-Request-Reason": "submit",
-      "X-Request-ID": requestId,
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await response.text();
-  process.stdout.write(JSON.stringify({
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-    bodyText: text,
-  }));
-} catch (error) {
-  process.stdout.write(JSON.stringify({
-    status: 0,
-    contentType: null,
-    bodyText: String(error && error.message ? error.message : error),
-  }));
-}
-`;
-
-  const { stdout } = await execFileAsync(
-    "bun",
-    ["-e", script],
-    {
-      encoding: "utf8",
-      maxBuffer: MAX_BUN_STDOUT_BYTES,
-      signal,
-      env: {
-        ...process.env,
-        PI_PPLX_ENDPOINT: PERPLEXITY_ENDPOINT,
-        PI_PPLX_TOKEN: jwt,
-        PI_PPLX_BODY: JSON.stringify(requestBody),
-        PI_PPLX_REQUEST_ID: requestId,
-      },
-    },
-  );
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    throw new Error("Bun fallback returned non-JSON output.");
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Bun fallback returned invalid payload.");
-  }
-
-  const result = parsed as Partial<BunFetchResult>;
-  if (typeof result.status !== "number" || typeof result.bodyText !== "string") {
-    throw new Error("Bun fallback response missing required fields.");
-  }
-
-  return {
-    status: result.status,
-    contentType: typeof result.contentType === "string" ? result.contentType : null,
-    bodyText: result.bodyText,
-  };
-}
-
 /** Execute a Perplexity search: POST SSE, stream/merge events, extract answer + sources. Throws SearchError on failure. */
 export async function searchPerplexity(
   params: SearchParams,
@@ -302,66 +270,72 @@ export async function searchPerplexity(
   const requestBody = buildRequestBody(params);
   const requestHeaders = buildRequestHeaders(jwt, requestId);
 
-  let response: Response;
-  try {
-    response = await fetch(PERPLEXITY_ENDPOINT, {
-      method: "POST",
-      headers: requestHeaders,
-      body: JSON.stringify(requestBody),
-      signal,
-    });
-  } catch (error) {
-    if (signal?.aborted) {
-      throw new SearchError("NETWORK", "Perplexity request was cancelled.");
-    }
+  let eventStream: ReadableStream<Uint8Array>;
 
-    throw new SearchError(
-      "NETWORK",
-      `Could not connect to Perplexity. ${(error as Error).message || "Network failure."}`,
-    );
-  }
+  // Bun's native fetch passes Cloudflare; Node/jiti's fetch gets challenged.
+  // Use native fetch when running under Bun (tests, direct scripts),
+  // subprocess fallback when running under Node/jiti (pi extension runtime).
+  const useBunSubprocess = typeof Bun === "undefined";
 
-  let eventStream: ReadableStream<Uint8Array> | null = null;
-
-  if (!response.ok) {
-    let bodyText = "";
+  if (useBunSubprocess) {
+    let bunResult: { status: number; bodyText: string };
     try {
-      bodyText = await response.text();
-    } catch {
-      bodyText = "";
-    }
-
-    const contentType = response.headers.get("content-type");
-
-    if (isCloudflareChallenge(response.status, contentType, bodyText)) {
-      let bunResult: BunFetchResult;
-      try {
-        bunResult = await fetchViaBunRuntime(requestBody, jwt, requestId, signal);
-      } catch (error) {
-        throw new SearchError(
-          "NETWORK",
-          `Perplexity request hit Cloudflare challenge and Bun fallback failed: ${(error as Error).message || "unknown error"}`,
-        );
+      bunResult = await fetchViaBunRuntime(
+        PERPLEXITY_ENDPOINT,
+        requestHeaders,
+        JSON.stringify(requestBody),
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) {
+        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
       }
 
-      if (bunResult.status !== 200) {
-        throw mapHttpError(bunResult.status, bunResult.bodyText, bunResult.contentType);
-      }
-
-      eventStream = streamFromText(bunResult.bodyText);
-    } else {
-      throw mapHttpError(response.status, bodyText, contentType);
+      throw new SearchError(
+        "NETWORK",
+        `Could not connect to Perplexity. ${errorMessage(error)}`,
+      );
     }
+    if (bunResult.status === 0) {
+      throw new SearchError("NETWORK", bunResult.bodyText);
+    }
+    if (bunResult.status !== 200) {
+      throw mapHttpError(bunResult.status);
+    }
+    if (!bunResult.bodyText) {
+      throw new SearchError("STREAM", "Perplexity returned an empty response.");
+    }
+
+    eventStream = streamFromText(bunResult.bodyText);
   } else {
+    let response: Response;
+    try {
+      response = await fetch(PERPLEXITY_ENDPOINT, {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+        signal: signal ?? null,
+      });
+    } catch (error) {
+      if (signal?.aborted) {
+        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
+      }
+
+      throw new SearchError(
+        "NETWORK",
+        `Could not connect to Perplexity. ${errorMessage(error)}`,
+      );
+    }
+
+    if (!response.ok) {
+      throw mapHttpError(response.status);
+    }
+
     if (!response.body) {
       throw new SearchError("STREAM", "Perplexity returned an empty stream body.");
     }
 
     eventStream = response.body;
-  }
-
-  if (!eventStream) {
-    throw new SearchError("STREAM", "Perplexity returned no readable stream.");
   }
 
   let snapshot: StreamEvent = {};
@@ -384,7 +358,7 @@ export async function searchPerplexity(
 
     throw new SearchError(
       "STREAM",
-      `Failed to parse Perplexity stream: ${(error as Error).message || "unknown error"}`,
+      `Failed to parse Perplexity stream: ${errorMessage(error)}`,
     );
   }
 
@@ -405,10 +379,12 @@ export async function searchPerplexity(
     );
   }
 
-  return {
+  const result: SearchResult = {
     answer: answer || "No answer text returned by Perplexity.",
     sources,
-    displayModel: snapshot.display_model,
-    uuid: snapshot.uuid,
   };
+  if (snapshot.display_model !== undefined) result.displayModel = snapshot.display_model;
+  if (snapshot.uuid !== undefined) result.uuid = snapshot.uuid;
+
+  return result;
 }

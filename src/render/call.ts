@@ -1,5 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
+import { asString, asPositiveNumber, truncate } from "./util.js";
 
 interface PerplexityCallArgs {
   query?: unknown;
@@ -8,27 +9,6 @@ interface PerplexityCallArgs {
 }
 
 const RECENCY_VALUES = new Set(["hour", "day", "week", "month", "year"] as const);
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-function asPositiveNumber(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-
-  return value;
-}
-
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, Math.max(1, maxLength - 1))}…`;
-}
-
 export function renderPerplexityCall(args: PerplexityCallArgs, theme: Theme): Text {
   const query = asString(args?.query)?.trim();
   const recencyRaw = asString(args?.recency)?.trim().toLowerCase();

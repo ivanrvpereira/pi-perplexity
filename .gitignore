@@ -1,2 +1,4 @@
 node_modules/
 .env
+local_tests/
+[Pp][Ll][Aa][Nn].[Mm][Dd]

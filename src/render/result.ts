@@ -1,5 +1,6 @@
 import type { AgentToolResult, Theme, ToolRenderResultOptions } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
+import { asString, asNumber, truncate } from "./util.js";
 
 interface PerplexityResultDetails {
   model?: unknown;
@@ -9,23 +10,6 @@ interface PerplexityResultDetails {
   toolCallId?: unknown;
   error?: unknown;
 }
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, Math.max(1, maxLength - 1))}…`;
-}
-
 function extractTextContent(result: AgentToolResult<PerplexityResultDetails>): string | undefined {
   if (!Array.isArray(result?.content)) {
     return undefined;
@@ -63,7 +47,11 @@ export function renderPerplexityResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): Text {
-  const details = (result?.details ?? {}) as PerplexityResultDetails;
+  const raw = result?.details;
+  const details: PerplexityResultDetails =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as PerplexityResultDetails)
+      : {};
   const contentText = extractTextContent(result);
 
   if (options?.isPartial) {

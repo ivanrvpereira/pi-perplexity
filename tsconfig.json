@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",

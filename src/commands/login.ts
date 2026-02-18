@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { authenticate } from "../auth/login.js";
 import { clearToken } from "../auth/storage.js";
 import { AuthError } from "../search/types.js";
+import { errorMessage } from "../render/util.js";
 
 const LOGIN_COMMAND_NAME = "perplexity-login";
 
@@ -110,7 +111,7 @@ export function registerPerplexityCommands(pi: ExtensionAPI): void {
           return;
         }
 
-        ctx.ui.notify(`Perplexity login failed: ${(error as Error).message || "Unknown error"}`, "error");
+        ctx.ui.notify(`Perplexity login failed: ${errorMessage(error)}`, "error");
       }
     },
   });

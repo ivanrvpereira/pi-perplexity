@@ -1,5 +1,9 @@
 import type { StreamBlock, StreamEvent } from "./types.js";
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function parseEventPayload(payload: string): StreamEvent | null {
   const trimmed = payload.trim();
   if (!trimmed || trimmed === "[DONE]") {
@@ -7,10 +11,11 @@ function parseEventPayload(payload: string): StreamEvent | null {
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (!parsed || typeof parsed !== "object") {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!isPlainObject(parsed)) {
       return null;
     }
+    // StreamEvent fields are all optional — any plain object is a valid shape.
     return parsed as StreamEvent;
   } catch {
     return null;
@@ -126,12 +131,16 @@ export function mergeMarkdownBlock(
     (mergedChunks.length > 0 ? mergedChunks.join("") : undefined) ??
     existing.answer;
 
-  return {
+  const result: { answer?: string; chunks?: string[]; chunk_starting_offset?: number } = {
     ...existing,
     ...incoming,
-    answer: mergedAnswer,
     chunks: mergedChunks,
   };
+  if (mergedAnswer !== undefined) {
+    result.answer = mergedAnswer;
+  }
+
+  return result;
 }
 
 function mergeSingleBlock(existing: StreamBlock, incoming: StreamBlock): StreamBlock {

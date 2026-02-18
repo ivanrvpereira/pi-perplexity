@@ -43,7 +43,6 @@ export interface StreamSource {
 export interface StoredToken {
   type: "oauth";
   access: string;
-  expires: number;
   email?: string;
 }
 
@@ -70,7 +69,7 @@ export class SearchError extends Error {
   }
 }
 
-export type AuthErrorCode = "NO_TOKEN" | "EXPIRED" | "EXTRACTION_FAILED";
+export type AuthErrorCode = "NO_TOKEN" | "EXTRACTION_FAILED";
 
 export class AuthError extends Error {
   constructor(
