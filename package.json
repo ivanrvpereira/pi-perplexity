@@ -1,6 +1,19 @@
 {
   "name": "pi-perplexity",
   "version": "0.1.0",
+  "description": "Perplexity web search for pi — uses your Pro/Max subscription, no API credits needed",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "author": "ivanrvpereira",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ivanrvpereira/pi-perplexity.git"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
   "type": "module",
   "main": "src/index.ts",
   "pi": {
