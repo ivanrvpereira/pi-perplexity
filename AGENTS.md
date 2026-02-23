@@ -158,6 +158,10 @@ Model: <display_model>
 | Pi extension system overview | `docs/pi_docs_extension.md` |
 | Pi platform reference (SDK, RPC, sessions, settings, packages) | `docs/pi_platform_reference.md` |
 
+## Design Decisions
+
+See `docs/design-decisions.md` for rationale on non-obvious choices.
+
 ## Common Gotchas
 
 - `Type.Union([Type.Literal("a"), ...])` does NOT work for Google models — use `StringEnum` from `@mariozechner/pi-ai`

@@ -99,13 +99,11 @@ export default factory;
 
 ## Phase 2: Auth — JWT Acquisition and Storage
 
-### 2.1 JWT utilities (`src/auth/jwt.ts`)
+### 2.1 ~~JWT utilities (`src/auth/jwt.ts`)~~ — dropped
 
-Implement:
-- `decodeJwtExpiry(token: string): number` — base64url decode payload, extract `exp` claim, return ms with 5-min margin. Fallback: now + 1 hour.
-- `isJwtExpired(token: string, bufferMs?: number): boolean`
-
-No dependencies. Use `atob` or `Buffer.from(payload, "base64url")`.
+Proactive expiry checking was dropped in favour of reactive re-auth: on HTTP 401/403
+the tool returns an error directing the user to run `/perplexity-login --force`.
+See `docs/design-decisions.md` for rationale.
 
 ### 2.2 Token storage (`src/auth/storage.ts`)
 
