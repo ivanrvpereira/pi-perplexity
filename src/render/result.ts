@@ -9,6 +9,7 @@ interface PerplexityResultDetails {
   uuid?: unknown;
   toolCallId?: unknown;
   error?: unknown;
+  isError?: unknown;
 }
 function extractTextContent(result: AgentToolResult<PerplexityResultDetails>): string | undefined {
   if (!Array.isArray(result?.content)) {
@@ -32,14 +33,6 @@ function extractTextContent(result: AgentToolResult<PerplexityResultDetails>): s
   }
 
   return undefined;
-}
-
-function isErrorText(text: string | undefined): boolean {
-  if (!text) {
-    return false;
-  }
-
-  return text.startsWith("Authentication failed:") || text.startsWith("Perplexity search failed:");
 }
 
 export function renderPerplexityResult(
@@ -69,7 +62,7 @@ export function renderPerplexityResult(
     return new Text(theme.fg("error", `Perplexity error: ${error}`), 0, 0);
   }
 
-  if (isErrorText(contentText)) {
+  if (details.isError === true) {
     return new Text(theme.fg("error", truncate(contentText ?? "Perplexity request failed", 200)), 0, 0);
   }
 

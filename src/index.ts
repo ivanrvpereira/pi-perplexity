@@ -5,7 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { registerPerplexityCommands } from "./commands/login.js";
 
 import { authenticate } from "./auth/login.js";
-import { clearToken } from "./auth/storage.js";
+
 import { formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
@@ -99,17 +99,29 @@ export default function (pi: ExtensionAPI) {
         if (error instanceof AuthError) {
           return {
             content: [{ type: "text", text: `Authentication failed: ${error.message}` }],
-            details: { sourceCount, queryMs },
+            details: { sourceCount, queryMs, isError: true },
           };
         }
 
         if (error instanceof SearchError) {
           if (error.code === "AUTH") {
-            await clearToken().catch(() => undefined);
+            // Do NOT clear the token here. The user must re-login explicitly via
+            // /perplexity-login --force. Clearing automatically would silently discard
+            // a token that may still be valid (e.g. a transient 401), and removes the
+            // user's ability to inspect or recover the cached credential themselves.
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Perplexity authentication failed. Run /perplexity-login --force to re-authenticate.`,
+                },
+              ],
+              details: { sourceCount, queryMs, isError: true },
+            };
           }
           return {
             content: [{ type: "text", text: `Perplexity search failed: ${error.message}` }],
-            details: { sourceCount, queryMs },
+            details: { sourceCount, queryMs, isError: true },
           };
         }
 
@@ -120,7 +132,7 @@ export default function (pi: ExtensionAPI) {
               text: `Perplexity search failed: ${errorMessage(error)}`,
             },
           ],
-          details: { sourceCount, queryMs },
+          details: { sourceCount, queryMs, isError: true },
         };
       }
     },
