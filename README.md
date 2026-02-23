@@ -99,28 +99,6 @@ bun test           # Run tests
 bunx tsc --noEmit  # Type check
 ```
 
-### Project structure
-
-```
-src/
-  index.ts          # Extension entry — registers tool and commands
-  constants.ts      # Shared constants (User-Agent, API version)
-  auth/
-    login.ts        # macOS app extraction + email OTP flow
-    storage.ts      # Token persistence (~/.config/pi-perplexity/auth.json)
-  commands/
-    login.ts        # /perplexity-login slash command handler
-  search/
-    types.ts        # Type definitions (StreamEvent, SearchResult, errors)
-    client.ts       # POST to SSE endpoint, event merging, result extraction
-    stream.ts       # SSE line parser + incremental event merging
-    format.ts       # SearchResult → LLM-readable text
-  render/
-    call.ts         # TUI component for tool call display
-    result.ts       # TUI component for tool result display
-    util.ts         # Shared render utilities
-```
-
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
