@@ -3,7 +3,8 @@
   "version": "0.1.2",
   "description": "Perplexity web search for pi — uses your Pro/Max subscription, no API credits needed",
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi-extension"
   ],
   "license": "MIT",
   "author": "ivanrvpereira",
