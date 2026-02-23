@@ -1,8 +1,10 @@
 {
   "name": "pi-perplexity",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Perplexity web search for pi — uses your Pro/Max subscription, no API credits needed",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "license": "MIT",
   "author": "ivanrvpereira",
   "repository": {
@@ -17,7 +19,9 @@
   "type": "module",
   "main": "src/index.ts",
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-tui": "*",
