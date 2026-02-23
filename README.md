@@ -85,7 +85,7 @@ Model: pplx_pro_upgraded
 
 ```bash
 bun install             # Install dev dependencies
-bun test                # Run tests (29 tests across 5 files)
+bun test                # Run tests (30 tests across 6 files)
 bunx tsc --noEmit       # Type check
 ```
 
@@ -110,20 +110,25 @@ src/
     util.ts             # Shared render utilities
 ```
 
-### Zero Runtime Dependencies
+### Runtime Dependencies
 
-This extension has **no npm dependencies**. Everything uses platform globals:
+This extension depends on the `bun` runtime package at execution time.
+
+Why: when pi loads extensions under Node/jiti, direct `fetch` to Perplexity is Cloudflare-challenged, so searches are executed through a Bun subprocess.
+
+Everything else uses platform globals:
 
 - `fetch` — HTTP requests
 - `crypto.randomUUID()` — request IDs
 - `ReadableStream` — SSE parsing
 - `Intl.DateTimeFormat` — timezone detection
 
-Only peer dependencies (`@sinclair/typebox`, `@mariozechner/pi-tui`, `@mariozechner/pi-ai`) are used, provided by pi at runtime.
+Peer dependencies (`@sinclair/typebox`, `@mariozechner/pi-tui`, `@mariozechner/pi-ai`) are provided by pi at runtime.
 
 ## Requirements
 
 - Perplexity **Pro** or **Max** subscription
+- Bun installed and available on `PATH` (used by the search client when running under Node/jiti)
 - macOS (for desktop app token extraction) or interactive terminal (for email OTP)
 
 ## License

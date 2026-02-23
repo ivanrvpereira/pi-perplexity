@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -38,6 +38,8 @@ export async function loadToken(): Promise<StoredToken | null> {
 export async function saveToken(token: StoredToken): Promise<void> {
   await mkdir(dirname(TOKEN_PATH), { recursive: true });
   await writeFile(TOKEN_PATH, `${JSON.stringify(token, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  // writeFile mode only applies on create; enforce on existing files too.
+  await chmod(TOKEN_PATH, 0o600);
 }
 
 /** Delete the stored token file. No-op if missing. */
