@@ -4,14 +4,13 @@ import { promisify } from "node:util";
 import { AuthError } from "../search/types.js";
 import { errorMessage } from "../render/util.js";
 import { loadToken, saveToken } from "./storage.js";
+import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
 
 const DESKTOP_AUTH_HELP =
   "Install the Perplexity desktop app and sign in, or set PI_AUTH_NO_BORROW=1 to skip desktop token borrowing.";
 const OTP_AUTH_HELP =
   "Provide credentials via PI_PERPLEXITY_EMAIL and PI_PERPLEXITY_OTP, or run interactively to enter email and OTP.";
 const AUTH_BASE_URL = "https://www.perplexity.ai/api/auth";
-const PERPLEXITY_USER_AGENT = "Perplexity/641 CFNetwork/1568 Darwin/25.2.0";
-const PERPLEXITY_API_VERSION = "2.18";
 
 const execFileAsync = promisify(execFile);
 

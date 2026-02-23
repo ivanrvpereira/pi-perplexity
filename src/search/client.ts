@@ -2,9 +2,9 @@ import { mergeEvent, readSseEvents } from "./stream.js";
 import type { SearchResult, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
 import { errorMessage } from "../render/util.js";
+import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
-const PERPLEXITY_USER_AGENT = "Perplexity/641 CFNetwork/1568 Darwin/25.2.0";
 
 
 function streamFromText(text: string): ReadableStream<Uint8Array> {
@@ -214,7 +214,7 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
       attachments: [],
       frontend_uuid: crypto.randomUUID(),
       frontend_context_uuid: crypto.randomUUID(),
-      version: "2.18",
+      version: PERPLEXITY_API_VERSION,
       language: "en-US",
       timezone,
       search_recency_filter: params.recency ?? null,
@@ -234,7 +234,7 @@ function buildRequestHeaders(jwt: string, requestId: string): Record<string, str
     Referer: "https://www.perplexity.ai/",
     "User-Agent": PERPLEXITY_USER_AGENT,
     "X-App-ApiClient": "default",
-    "X-App-ApiVersion": "2.18",
+    "X-App-ApiVersion": PERPLEXITY_API_VERSION,
     "X-Perplexity-Request-Reason": "submit",
     "X-Request-ID": requestId,
   };
