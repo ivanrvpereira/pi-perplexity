@@ -1,7 +1,6 @@
 # pi-perplexity
 
-A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding agent real-time web search powered by your **Perplexity Pro or Max subscription** — no API key, no extra credits, just your existing plan.
-
+A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding agent real-time web search powered by your **Perplexity Pro or Max subscription**
 ## Requirements
 
 - [pi](https://github.com/badlogic/pi-mono) coding agent
