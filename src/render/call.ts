@@ -1,6 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { asString, asPositiveNumber, truncate } from "./util.js";
+import { asString, asPositiveInteger, truncate } from "./util.js";
 
 interface PerplexityCallArgs {
   query?: unknown;
@@ -15,7 +15,7 @@ export function renderPerplexityCall(args: PerplexityCallArgs, theme: Theme): Te
   const recency = recencyRaw && RECENCY_VALUES.has(recencyRaw as (typeof RECENCY_VALUES extends Set<infer T> ? T : never))
     ? recencyRaw
     : undefined;
-  const limit = asPositiveNumber(args?.limit);
+  const limit = asPositiveInteger(args?.limit);
 
   let text = theme.fg("toolTitle", theme.bold("perplexity_search "));
   text += query ? theme.fg("muted", truncate(query, 90)) : theme.fg("warning", "(missing query)");
@@ -25,7 +25,7 @@ export function renderPerplexityCall(args: PerplexityCallArgs, theme: Theme): Te
   }
 
   if (typeof limit === "number") {
-    text += theme.fg("dim", ` • limit ${Math.round(limit)}`);
+    text += theme.fg("dim", ` • limit ${limit}`);
   }
 
   return new Text(text, 0, 0);

@@ -20,6 +20,11 @@ export function asPositiveNumber(value: unknown): number | undefined {
 	return value;
 }
 
+export function asPositiveInteger(value: unknown): number | undefined {
+	const n = asPositiveNumber(value);
+	return n !== undefined ? Math.floor(n) : undefined;
+}
+
 export function truncate(text: string, maxLength: number): string {
 	if (text.length <= maxLength) {
 		return text;
