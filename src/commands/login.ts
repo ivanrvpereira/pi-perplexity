@@ -67,38 +67,21 @@ export function registerPerplexityCommands(pi: ExtensionAPI): void {
         await clearToken().catch(() => undefined);
       }
 
-      let canceledAtEmailPrompt = false;
-      let canceledAtOtpPrompt = false;
-
       const promptForEmail = async (): Promise<string | undefined> => {
         const value = await ctx.ui.input("Perplexity email", "you@example.com");
-        if (!value?.trim()) {
-          canceledAtEmailPrompt = true;
-          return undefined;
-        }
-
-        return value;
+        return value?.trim() || undefined;
       };
 
       const promptForOtp = async (email: string): Promise<string | undefined> => {
         const value = await ctx.ui.input(`Enter OTP sent to ${email}`, "123456");
-        if (!value?.trim()) {
-          canceledAtOtpPrompt = true;
-          return undefined;
-        }
-
-        return value;
+        return value?.trim() || undefined;
       };
 
       try {
-        await authenticate({
-          promptForEmail,
-          promptForOtp,
-        });
-
+        await authenticate({ promptForEmail, promptForOtp });
         ctx.ui.notify("Perplexity login successful. Token saved.", "info");
       } catch (error) {
-        if (canceledAtEmailPrompt || canceledAtOtpPrompt) {
+        if (error instanceof AuthError && error.code === "NO_TOKEN") {
           ctx.ui.notify(
             "Perplexity login canceled. Re-run /perplexity-login and provide email + OTP, or set PI_PERPLEXITY_EMAIL and PI_PERPLEXITY_OTP.",
             "warning",
