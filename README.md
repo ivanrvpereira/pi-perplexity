@@ -12,15 +12,13 @@ A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding age
 ## Installation
 
 ```bash
-pi install pi-perplexity
+pi install npm:pi-perplexity
 ```
 
-Or add to your `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project):
+Or from GitHub:
 
-```json
-{
-  "packages": ["pi-perplexity"]
-}
+```bash
+pi install github:ivanrvpereira/pi-perplexity
 ```
 
 ## Authentication
