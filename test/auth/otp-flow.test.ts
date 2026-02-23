@@ -13,7 +13,7 @@ const originalOtp = process.env.PI_PERPLEXITY_OTP;
 
 // --- Fixtures from real Perplexity responses (scripts/debug-login-dump.json) ---
 
-/** Real JWE token structure: alg=dir, enc=A256GCM — NOT a JWT, opaque to us */
+/** Fake JWE token — same structure as real Perplexity tokens (alg=dir, enc=A256GCM) but not a valid credential */
 const REAL_JWE_TOKEN =
   "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAA";
 
