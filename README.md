@@ -1,6 +1,13 @@
 # pi-perplexity
 
-A [pi](https://github.com/nickarrow/pi-coding-agent) extension that provides web search via a Perplexity Pro/Max subscription. Uses your existing subscription — no API credits consumed.
+A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding agent real-time web search powered by your **Perplexity Pro or Max subscription** — no API key, no extra credits, just your existing plan.
+
+## Requirements
+
+- [pi](https://github.com/badlogic/pi-mono) coding agent
+- [Bun](https://bun.sh) runtime (available on `PATH`)
+- A **Perplexity Pro** or **Max** subscription
+- macOS (for zero-interaction auth) _or_ an interactive terminal (for email OTP)
 
 ## Installation
 
@@ -8,129 +15,112 @@ A [pi](https://github.com/nickarrow/pi-coding-agent) extension that provides web
 pi install pi-perplexity
 ```
 
-## Usage
+Or add to your `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project):
 
-Once installed, the agent gains a `perplexity_search` tool it can call automatically when it needs to look something up. You can also trigger a search by asking the agent to search for something.
-
-### Tool Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | yes | Search query |
-| `recency` | string | no | Filter by age: `hour`, `day`, `week`, `month`, `year` |
-| `limit` | number | no | Max sources to return (1–50) |
-
-### Slash Command
-
-```
-/perplexity-login            # Authenticate and save token
-/perplexity-login --force    # Clear cached token and re-authenticate
+```json
+{
+  "packages": ["pi-perplexity"]
+}
 ```
 
 ## Authentication
 
-The extension tries two auth methods in order:
+Run the login command once to cache your token:
 
-1. **macOS Desktop App** (automatic) — Borrows the JWT from the Perplexity macOS app if installed and signed in. Zero interaction required.
+```
+/perplexity-login
+```
 
-2. **Email OTP** (interactive fallback) — Prompts for your Perplexity email, sends a one-time code, and prompts for the code.
+The extension tries two methods in order:
 
-The token is cached at `~/.config/pi-perplexity/auth.json` (permissions `0600`). On HTTP 401/403, the cached token is automatically cleared so the next search re-authenticates.
+1. **macOS Desktop App** _(zero interaction)_ — borrows the JWT directly from the Perplexity macOS app if it's installed and signed in. Nothing to type.
+2. **Email OTP** _(interactive fallback)_ — prompts for your Perplexity email, sends a one-time code, and prompts for the code.
 
-### Environment Variables
+The token is saved to `~/.config/pi-perplexity/auth.json` (mode `0600`) and reused across sessions. On auth failure, run `/perplexity-login --force` to clear and re-authenticate.
+
+### Environment variables
 
 | Variable | Description |
-|----------|-------------|
-| `PI_AUTH_NO_BORROW=1` | Skip macOS desktop app token extraction |
-| `PI_PERPLEXITY_EMAIL` | Email for OTP auth (skips interactive prompt) |
-| `PI_PERPLEXITY_OTP` | OTP code for non-interactive auth |
+|---|---|
+| `PI_AUTH_NO_BORROW=1` | Skip macOS desktop app extraction and go straight to email OTP |
+| `PI_PERPLEXITY_EMAIL` | Pre-fill the email prompt (useful for non-interactive setups) |
+| `PI_PERPLEXITY_OTP` | Pre-fill the OTP prompt |
 
-## How It Works
+## Usage
 
-The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) with your subscription credentials. Responses stream as incremental events that are merged into a final result containing an answer and sources.
+Once installed, the agent automatically calls `perplexity_search` whenever it needs current information. You can also ask it directly:
 
-All queries use `is_incognito: true` — nothing appears in your Perplexity search history.
+> "Search Perplexity for the latest React 19 release notes"
 
-### Output Format
+### Tool parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `query` | string | ✅ | The search query |
+| `recency` | string | — | Filter by age: `hour` · `day` · `week` · `month` · `year` |
+| `limit` | number | — | Max sources to include (1–50) |
+
+### Output format
 
 The tool returns structured text the agent can reason over:
 
 ```
 ## Answer
-<synthesized answer with inline citations>
+React 19 introduces Actions, use() hook, and improved Server Components...
 
 ## Sources
 3 sources
-[1] Example Article (2d ago)
-    https://example.com/article
-    Brief snippet of the source content...
+[1] React 19 Release Notes (1d ago)
+    https://react.dev/blog/2024/12/05/react-19
+    React 19 is now stable. This release includes Actions for async...
 
-[2] Another Source (5h ago)
-    https://example.com/other
-    Another snippet preview...
+[2] What's New in React 19 (3d ago)
+    https://vercel.com/blog/react-19
+    A deep dive into the new primitives landing in React 19...
 
 ## Meta
 Provider: perplexity (oauth)
 Model: pplx_pro_upgraded
 ```
 
+All queries use `is_incognito: true` — nothing shows up in your Perplexity history.
+
+## How It Works
+
+The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app or via email OTP. Responses stream as incremental events that are merged into a final result.
+
+When pi loads extensions under Node/jiti, direct `fetch` to Perplexity gets Cloudflare-challenged, so the search client shells out to a Bun subprocess — that's the only reason Bun is required.
+
 ## Development
 
-### Prerequisites
-
-- [Bun](https://bun.sh) runtime
-- pi coding agent (`@mariozechner/pi-coding-agent`)
-
-### Commands
-
 ```bash
-bun install             # Install dev dependencies
-bun test                # Run tests (30 tests across 6 files)
-bunx tsc --noEmit       # Type check
+bun install        # Install dev dependencies
+bun test           # Run tests
+bunx tsc --noEmit  # Type check
 ```
 
-### Project Structure
+### Project structure
 
 ```
 src/
-  index.ts              # Extension entry — registers tool and commands
+  index.ts          # Extension entry — registers tool and commands
+  constants.ts      # Shared constants (User-Agent, API version)
   auth/
-    login.ts            # macOS app extraction + email OTP flow
-    storage.ts          # Token persistence (~/.config/pi-perplexity/auth.json)
+    login.ts        # macOS app extraction + email OTP flow
+    storage.ts      # Token persistence (~/.config/pi-perplexity/auth.json)
   commands/
-    login.ts            # /perplexity-login slash command
+    login.ts        # /perplexity-login slash command handler
   search/
-    types.ts            # Type definitions (StreamEvent, SearchResult, errors)
-    client.ts           # HTTP POST to SSE endpoint, event merging, result extraction
-    stream.ts           # SSE line parser + incremental event merging
-    format.ts           # SearchResult → LLM-readable text output
+    types.ts        # Type definitions (StreamEvent, SearchResult, errors)
+    client.ts       # POST to SSE endpoint, event merging, result extraction
+    stream.ts       # SSE line parser + incremental event merging
+    format.ts       # SearchResult → LLM-readable text
   render/
-    call.ts             # TUI component for tool call display
-    result.ts           # TUI component for tool result display
-    util.ts             # Shared render utilities
+    call.ts         # TUI component for tool call display
+    result.ts       # TUI component for tool result display
+    util.ts         # Shared render utilities
 ```
-
-### Runtime Dependencies
-
-This extension depends on the `bun` runtime package at execution time.
-
-Why: when pi loads extensions under Node/jiti, direct `fetch` to Perplexity is Cloudflare-challenged, so searches are executed through a Bun subprocess.
-
-Everything else uses platform globals:
-
-- `fetch` — HTTP requests
-- `crypto.randomUUID()` — request IDs
-- `ReadableStream` — SSE parsing
-- `Intl.DateTimeFormat` — timezone detection
-
-Peer dependencies (`@sinclair/typebox`, `@mariozechner/pi-tui`, `@mariozechner/pi-ai`) are provided by pi at runtime.
-
-## Requirements
-
-- Perplexity **Pro** or **Max** subscription
-- Bun installed and available on `PATH` (used by the search client when running under Node/jiti)
-- macOS (for desktop app token extraction) or interactive terminal (for email OTP)
 
 ## License
 
-Private — not published.
+MIT — see [LICENSE](LICENSE) for details.
