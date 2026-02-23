@@ -8,7 +8,7 @@ function truncateSnippet(snippet: string): string {
     return normalized;
   }
 
-  return `${normalized.slice(0, MAX_SNIPPET_LENGTH - 3)}...`;
+  return `${normalized.slice(0, MAX_SNIPPET_LENGTH - 1)}…`;
 }
 
 function humanizeAge(timestamp?: string): string {

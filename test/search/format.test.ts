@@ -98,7 +98,7 @@ describe("formatForLLM", () => {
 
     const snippetLine = output
       .split("\n")
-      .find((line) => line.startsWith("    ") && line.includes("..."));
+      .find((line) => line.startsWith("    ") && line.includes("…"));
 
     expect(snippetLine).toBeDefined();
     expect(snippetLine!.trim().length).toBe(240);
