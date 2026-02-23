@@ -124,3 +124,9 @@ src/
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+## Disclaimer
+
+This project is intended for **educational and demonstration purposes only**. It reverse-engineers an undocumented internal endpoint and uses credentials borrowed from the Perplexity macOS desktop app. This likely violates [Perplexity's Terms of Service](https://www.perplexity.ai/hub/legal/terms-of-service) (§5.2). Use at your own risk — your account may be suspended. The author makes no warranties and accepts no liability for any consequences of its use.
