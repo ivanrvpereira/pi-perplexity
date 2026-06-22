@@ -3,9 +3,9 @@ import type { SearchResult, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
 import { errorMessage } from "../render/util.js";
 import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
+import { perplexityFetchText } from "../perplexity-fetch.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
-
 
 function streamFromText(text: string): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(text);
@@ -15,90 +15,6 @@ function streamFromText(text: string): ReadableStream<Uint8Array> {
       controller.close();
     },
   });
-}
-
-const MAX_BUN_STDOUT = 50 * 1024 * 1024;
-
-/**
- * Execute a Perplexity request via a Bun subprocess.
- * Pi loads extensions under Node/jiti whose fetch gets Cloudflare-challenged.
- * Bun's native fetch has a different TLS fingerprint that passes.
- */
-async function fetchViaBunRuntime(
-  url: string,
-  headers: Record<string, string>,
-  body: string,
-  signal?: AbortSignal,
-): Promise<{ status: number; bodyText: string }> {
-  const script = `
-const c = JSON.parse(await Bun.stdin.text());
-try {
-  const r = await fetch(c.url, { method: "POST", headers: c.headers, body: c.body });
-  const t = await r.text();
-  process.stdout.write(JSON.stringify({ s: r.status, b: t }));
-} catch (e) {
-  process.stdout.write(JSON.stringify({ s: 0, b: String(e?.message ?? e) }));
-}
-`;
-
-  // Dynamic import: spawn is only needed under Node/jiti (not Bun),
-  // and Bun's node:child_process polyfill may not export it.
-  const { spawn } = await import("node:child_process");
-
-  const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn("bun", ["-e", script], {
-      stdio: ["pipe", "pipe", "ignore"],
-      env: { HOME: process.env.HOME, PATH: process.env.PATH },
-    });
-
-    if (signal) {
-      const onAbort = () => child.kill();
-      signal.addEventListener("abort", onAbort, { once: true });
-      child.on("close", () => signal.removeEventListener("abort", onAbort));
-    }
-
-    if (!child.stdin || !child.stdout) {
-      reject(new Error("Failed to open subprocess pipes"));
-      return;
-    }
-
-    child.stdin.write(JSON.stringify({ url, headers, body }));
-    child.stdin.end();
-
-    const chunks: Buffer[] = [];
-    let totalLen = 0;
-    child.stdout.on("data", (chunk: Buffer) => {
-      totalLen += chunk.length;
-      if (totalLen <= MAX_BUN_STDOUT) {
-        chunks.push(chunk);
-      }
-    });
-
-    child.on("close", () => resolve(Buffer.concat(chunks).toString("utf8")));
-    child.on("error", reject);
-  });
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    throw new Error(`Bun subprocess returned invalid output: ${stdout.slice(0, 200)}`);
-  }
-
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    Array.isArray(parsed)
-  ) {
-    throw new Error("Bun subprocess response is not an object.");
-  }
-
-  const obj = parsed as Record<string, unknown>;
-  if (typeof obj.s !== "number" || typeof obj.b !== "string") {
-    throw new Error("Bun subprocess response missing required fields.");
-  }
-
-  return { status: obj.s, bodyText: obj.b };
 }
 
 export interface SearchParams {
@@ -274,20 +190,15 @@ export async function searchPerplexity(
 
   let eventStream: ReadableStream<Uint8Array>;
 
-  // Bun's native fetch passes Cloudflare; Node/jiti's fetch gets challenged.
-  // Use native fetch when running under Bun (tests, direct scripts),
-  // subprocess fallback when running under Node/jiti (pi extension runtime).
-  const useBunSubprocess = typeof Bun === "undefined";
-
-  if (useBunSubprocess) {
-    let bunResult: { status: number; bodyText: string };
+  if (typeof Bun === "undefined") {
+    let response: { status: number; bodyText: string };
     try {
-      bunResult = await fetchViaBunRuntime(
-        PERPLEXITY_ENDPOINT,
-        requestHeaders,
-        JSON.stringify(requestBody),
-        signal,
-      );
+      response = await perplexityFetchText(PERPLEXITY_ENDPOINT, {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+        signal: signal ?? null,
+      });
     } catch (error) {
       if (signal?.aborted) {
         throw new SearchError("NETWORK", "Perplexity request was cancelled.");
@@ -298,17 +209,18 @@ export async function searchPerplexity(
         `Could not connect to Perplexity. ${errorMessage(error)}`,
       );
     }
-    if (bunResult.status === 0) {
-      throw new SearchError("NETWORK", bunResult.bodyText);
+
+    if (response.status === 0) {
+      throw new SearchError("NETWORK", response.bodyText);
     }
-    if (bunResult.status !== 200) {
-      throw mapHttpError(bunResult.status);
+    if (response.status !== 200) {
+      throw mapHttpError(response.status);
     }
-    if (!bunResult.bodyText) {
+    if (!response.bodyText) {
       throw new SearchError("STREAM", "Perplexity returned an empty response.");
     }
 
-    eventStream = streamFromText(bunResult.bodyText);
+    eventStream = streamFromText(response.bodyText);
   } else {
     let response: Response;
     try {

@@ -89,7 +89,7 @@ Queries default to `is_incognito: true`, but you can override that per call or v
 
 The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app or via email OTP. Responses stream as incremental events that are merged into a final result.
 
-When pi loads extensions under Node/jiti, direct `fetch` to Perplexity gets Cloudflare-challenged, so the search client shells out to a Bun subprocess — that's the only reason Bun is required.
+When pi loads extensions under Node/jiti, direct `fetch` to Perplexity can get Cloudflare-challenged, so Perplexity network calls shell out to a Bun subprocess — that's the only reason Bun is required.
 
 ## Development
 

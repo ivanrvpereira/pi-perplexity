@@ -5,6 +5,10 @@ import { AuthError } from "../search/types.js";
 import { errorMessage } from "../render/util.js";
 import { loadToken, saveToken } from "./storage.js";
 import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
+import {
+  perplexityFetchText as fetchAuth,
+  type PerplexityFetchResponse as AuthFetchResponse,
+} from "../perplexity-fetch.js";
 
 const DESKTOP_AUTH_HELP =
   "Install the Perplexity desktop app and sign in, or set PI_AUTH_NO_BORROW=1 to skip desktop token borrowing.";
@@ -29,9 +33,30 @@ function buildAuthHeaders(includeJsonContentType = false): Record<string, string
   return {
     Accept: "application/json",
     ...(includeJsonContentType ? { "Content-Type": "application/json" } : {}),
+    Origin: "https://www.perplexity.ai",
+    Referer: "https://www.perplexity.ai/",
     "User-Agent": PERPLEXITY_USER_AGENT,
+    "X-App-ApiClient": "default",
     "X-App-ApiVersion": PERPLEXITY_API_VERSION,
   };
+}
+
+function parseJsonResponse(response: AuthFetchResponse): unknown {
+  try {
+    return JSON.parse(response.bodyText) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function formatHttpFailure(action: string, response: AuthFetchResponse): string {
+  const bodyPreview = response.bodyText.trim().replace(/\s+/g, " ").slice(0, 160);
+  const suffix = bodyPreview ? `: ${bodyPreview}` : "";
+  return `${action} (HTTP ${response.status}${suffix}).`;
+}
+
+function cookieHeaderFrom(cookies: string[]): string {
+  return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
 }
 
 function extractTokenFromPayload(payload: unknown): string | null {
@@ -46,31 +71,23 @@ function extractTokenFromPayload(payload: unknown): string | null {
   return null;
 }
 
-async function readJsonResponse(response: Response): Promise<unknown> {
-  try {
-    return (await response.json()) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 async function loginWithEmailOtp(
   email: string,
   options: AuthenticateOptions,
 ): Promise<string> {
   const signal = options.signal ?? null;
 
-  const csrfResponse = await fetch(`${AUTH_BASE_URL}/csrf`, {
+  const csrfResponse = await fetchAuth(`${AUTH_BASE_URL}/csrf`, {
     method: "GET",
     headers: buildAuthHeaders(),
     signal,
   });
 
   if (!csrfResponse.ok) {
-    throw new Error(`Failed to fetch CSRF token (HTTP ${csrfResponse.status}).`);
+    throw new Error(formatHttpFailure("Failed to fetch CSRF token", csrfResponse));
   }
 
-  const csrfPayload = (await readJsonResponse(csrfResponse)) as { csrfToken?: unknown } | null;
+  const csrfPayload = parseJsonResponse(csrfResponse) as { csrfToken?: unknown } | null;
   const csrfToken =
     csrfPayload && typeof csrfPayload.csrfToken === "string" ? csrfPayload.csrfToken : null;
 
@@ -78,15 +95,14 @@ async function loginWithEmailOtp(
     throw new Error("CSRF token missing from Perplexity auth response.");
   }
 
-  const cookies = csrfResponse.headers.getSetCookie?.() ?? [];
-  const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
+  const cookieHeader = cookieHeaderFrom(csrfResponse.cookies);
 
   const emailHeaders = buildAuthHeaders(true);
   if (cookieHeader) {
     emailHeaders.Cookie = cookieHeader;
   }
 
-  const emailResponse = await fetch(`${AUTH_BASE_URL}/signin-email`, {
+  const emailResponse = await fetchAuth(`${AUTH_BASE_URL}/signin-email`, {
     method: "POST",
     headers: emailHeaders,
     body: JSON.stringify({ email, csrfToken }),
@@ -94,7 +110,7 @@ async function loginWithEmailOtp(
   });
 
   if (!emailResponse.ok) {
-    throw new Error(`Failed to send OTP email (HTTP ${emailResponse.status}).`);
+    throw new Error(formatHttpFailure("Failed to send OTP email", emailResponse));
   }
 
   const otp =
@@ -113,7 +129,7 @@ async function loginWithEmailOtp(
     otpHeaders.Cookie = cookieHeader;
   }
 
-  const otpResponse = await fetch(`${AUTH_BASE_URL}/signin-otp`, {
+  const otpResponse = await fetchAuth(`${AUTH_BASE_URL}/signin-otp`, {
     method: "POST",
     headers: otpHeaders,
     body: JSON.stringify({ email, otp, csrfToken }),
@@ -121,10 +137,10 @@ async function loginWithEmailOtp(
   });
 
   if (!otpResponse.ok) {
-    throw new Error(`OTP verification failed (HTTP ${otpResponse.status}).`);
+    throw new Error(formatHttpFailure("OTP verification failed", otpResponse));
   }
 
-  const otpPayload = await readJsonResponse(otpResponse);
+  const otpPayload = parseJsonResponse(otpResponse);
   const token = extractTokenFromPayload(otpPayload);
   if (!token) {
     throw new Error("Perplexity OTP response did not include a token.");

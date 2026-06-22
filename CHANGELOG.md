@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-06-22
+
+### Fixed
+
+- Route email OTP authentication requests through the Bun-backed Perplexity fetch path to avoid CSRF 403 failures under Node/jiti.
+- Send browser-like auth headers and include response previews in OTP HTTP errors.
+
 ## [0.2.1] - 2026-05-11
 
 ### Changed
