@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "./test-helpers.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +15,7 @@ beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "pi-perplexity-command-test-"));
   configPath = join(tempDir, "config.json");
 
-  const mod = await import(`../src/config.ts?t=${Date.now()}`);
+  const mod = await import(`../src/config.js?t=${Date.now()}`);
   loadConfig = mod.loadConfig;
   saveConfig = mod.saveConfig;
 });

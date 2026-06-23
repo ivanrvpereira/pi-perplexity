@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
+
+import { describe, expect, test } from "../test-helpers.js";
 
 import { mergeEvent, mergeMarkdownBlock, readSseEvents } from "../../src/search/stream.js";
 import type { StreamEvent } from "../../src/search/types.js";
@@ -26,7 +28,7 @@ async function collectEvents(stream: ReadableStream<Uint8Array>): Promise<Stream
 
 describe("SSE stream parsing", () => {
   test("parses multiline data payloads and stops at [DONE]", async () => {
-    const fixture = await Bun.file("test/fixtures/sse-basic.txt").text();
+    const fixture = await readFile("test/fixtures/sse-basic.txt", "utf8");
     const events = await collectEvents(streamFromString(fixture, 5));
 
     expect(events).toHaveLength(2);
@@ -36,7 +38,7 @@ describe("SSE stream parsing", () => {
     expect(events[1].final).toBe(true);
   });
 
-  test("skips invalid JSON payloads and continues parsing", async () => {
+  test("throws on invalid JSON payloads", async () => {
     const payload = [
       "data: {invalid-json}",
       "",
@@ -46,9 +48,7 @@ describe("SSE stream parsing", () => {
       "",
     ].join("\n");
 
-    const events = await collectEvents(streamFromString(payload));
-    expect(events).toHaveLength(1);
-    expect(events[0].text).toBe("ok");
+    await expect(collectEvents(streamFromString(payload))).rejects.toThrow(SyntaxError);
   });
 });
 
@@ -89,7 +89,7 @@ describe("event merging", () => {
   });
 
   test("incremental fixture merges markdown and metadata", async () => {
-    const fixture = await Bun.file("test/fixtures/sse-incremental.txt").text();
+    const fixture = await readFile("test/fixtures/sse-incremental.txt", "utf8");
     let snapshot: StreamEvent = {};
 
     for await (const event of readSseEvents(streamFromString(fixture, 11))) {

@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "../test-helpers.js";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 async function importStorageModule() {
-  return import(`../../src/auth/storage.ts?test=${crypto.randomUUID()}`);
+  return import(`../../src/auth/storage.js?test=${crypto.randomUUID()}`);
 }
 
 afterEach(() => {

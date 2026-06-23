@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "./test-helpers.js";
 
 import { loadToken } from "../src/auth/storage.js";
 import { searchPerplexity } from "../src/search/client.js";
@@ -35,10 +35,11 @@ async function delay(ms: number): Promise<void> {
 describe("Perplexity model selection e2e", () => {
   maybeTest(
     "sends requested model slugs and receives matching display_model values",
+    { timeout: 180_000 },
     async () => {
       const token = await loadToken();
       if (!token) {
-        throw new Error("No cached Perplexity token. Run /perplexity-login before PI_PERPLEXITY_E2E=1 bun test.");
+        throw new Error("No cached Perplexity token. Run /perplexity-login before PI_PERPLEXITY_E2E=1 npm test.");
       }
 
       const models = configuredModels();
@@ -63,6 +64,5 @@ describe("Perplexity model selection e2e", () => {
         }
       }
     },
-    { timeout: 180_000 },
   );
 });

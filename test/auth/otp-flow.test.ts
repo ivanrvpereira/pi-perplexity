@@ -2,7 +2,7 @@
  * OTP login flow tests derived from real captured request/response data.
  * See scripts/debug-login-dump.json for the raw fixture.
  */
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "../test-helpers.js";
 
 import { AuthError, type StoredToken } from "../../src/search/types.js";
 
@@ -21,11 +21,23 @@ const CSRF_TOKEN = "0e4f8cc491e3197788492604ad32577f2022747fe30e0f51ba3ba235f07c
 
 const TEST_EMAIL = "user@test.com";
 const TEST_OTP = "9f3e2-knzol";
+const CSRF_COOKIES = [
+  "next-auth.csrf-token=csrf-cookie; Path=/; HttpOnly",
+  "cf_clearance=clearance-cookie; Path=/; Secure",
+];
+const CSRF_COOKIE_HEADER = "next-auth.csrf-token=csrf-cookie; cf_clearance=clearance-cookie";
 
 // ---
 
+function jsonHeaders(cookies: string[] = []): [string, string][] {
+  return [
+    ["content-type", "application/json; charset=utf-8"],
+    ...cookies.map((cookie): [string, string] => ["set-cookie", cookie]),
+  ];
+}
+
 async function importLoginModule() {
-  return import(`../../src/auth/login.ts?test=${crypto.randomUUID()}`);
+  return import(`../../src/auth/login.js?test=${crypto.randomUUID()}`);
 }
 
 function restoreEnv(): void {
@@ -74,21 +86,21 @@ function buildReplayFetchMock(options?: {
     if (url.endsWith("/csrf")) {
       return new Response(JSON.stringify({ csrfToken: CSRF_TOKEN }), {
         status: 200,
-        headers: { "content-type": "application/json; charset=utf-8" },
+        headers: jsonHeaders(CSRF_COOKIES),
       });
     }
 
     if (url.endsWith("/signin-email")) {
       return new Response(JSON.stringify({ success: "Email sign in triggered" }), {
         status: 200,
-        headers: { "content-type": "application/json; charset=utf-8" },
+        headers: jsonHeaders(),
       });
     }
 
     if (url.endsWith("/signin-otp")) {
       return new Response(JSON.stringify(otpBody), {
         status: 200,
-        headers: { "content-type": "application/json; charset=utf-8" },
+        headers: jsonHeaders(),
       });
     }
 
@@ -165,15 +177,17 @@ describe("OTP login flow (from real captured responses)", () => {
     expect(calls[0].init?.method ?? "GET").toBe("GET");
     expect(calls[0].init?.body).toBeFalsy();
 
-    // signin-email: POST with email + csrfToken
+    // signin-email: POST with email + csrfToken + CSRF cookies
     expect(calls[1].init?.method).toBe("POST");
+    expect(new Headers(calls[1].init?.headers).get("Cookie")).toBe(CSRF_COOKIE_HEADER);
     expect(JSON.parse(String(calls[1].init?.body))).toEqual({
       email: TEST_EMAIL,
       csrfToken: CSRF_TOKEN,
     });
 
-    // signin-otp: POST with email + otp + csrfToken
+    // signin-otp: POST with email + otp + csrfToken + CSRF cookies
     expect(calls[2].init?.method).toBe("POST");
+    expect(new Headers(calls[2].init?.headers).get("Cookie")).toBe(CSRF_COOKIE_HEADER);
     expect(JSON.parse(String(calls[2].init?.body))).toEqual({
       email: TEST_EMAIL,
       otp: TEST_OTP,
@@ -246,6 +260,34 @@ describe("OTP login flow (from real captured responses)", () => {
     expect((thrown as AuthError).code).toBe("NO_TOKEN");
   });
 
+  test("throws when CSRF response does not include auth cookies", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+
+    mockStorage();
+
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/csrf")) {
+        return new Response(JSON.stringify({ csrfToken: CSRF_TOKEN }), {
+          status: 200,
+          headers: jsonHeaders(),
+        });
+      }
+
+      return new Response("should not continue", { status: 500 });
+    });
+
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { authenticate } = await importLoginModule();
+
+    await expect(authenticate({ promptForEmail: async () => TEST_EMAIL })).rejects.toMatchObject({
+      name: "AuthError",
+      code: "EXTRACTION_FAILED",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test("throws when OTP verification returns non-200", async () => {
     process.env.PI_AUTH_NO_BORROW = "1";
 
@@ -257,14 +299,14 @@ describe("OTP login flow (from real captured responses)", () => {
       if (url.endsWith("/csrf")) {
         return new Response(JSON.stringify({ csrfToken: CSRF_TOKEN }), {
           status: 200,
-          headers: { "content-type": "application/json" },
+          headers: jsonHeaders(CSRF_COOKIES),
         });
       }
 
       if (url.endsWith("/signin-email")) {
         return new Response(JSON.stringify({ success: "Email sign in triggered" }), {
           status: 200,
-          headers: { "content-type": "application/json" },
+          headers: jsonHeaders(),
         });
       }
 

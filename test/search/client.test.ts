@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "../test-helpers.js";
 
 import { SearchError } from "../../src/search/types.js";
 
@@ -20,7 +20,7 @@ describe("searchPerplexity", () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(async () => {
-    const mod = await import(`../../src/search/client.ts?t=${Date.now()}`);
+    const mod = await import(`../../src/search/client.js?t=${Date.now()}`);
     searchPerplexity = mod.searchPerplexity;
   });
 
@@ -57,7 +57,7 @@ describe("searchPerplexity", () => {
 
     const controller = new AbortController();
     const result = await searchPerplexity(
-      { query: "latest bun release notes", recency: "week", model: "pplx_pro_upgraded", incognito: true },
+      { query: "latest Node release notes", recency: "week", model: "pplx_pro_upgraded", incognito: true },
       "jwt-token",
       controller.signal,
     );
@@ -85,8 +85,8 @@ describe("searchPerplexity", () => {
       };
     };
 
-    expect(body.query_str).toBe("latest bun release notes");
-    expect(body.params.query_str).toBe("latest bun release notes");
+    expect(body.query_str).toBe("latest Node release notes");
+    expect(body.params.query_str).toBe("latest Node release notes");
     expect(body.params.mode).toBe("copilot");
     expect(body.params.model_preference).toBe("pplx_pro_upgraded");
     expect(body.params.is_incognito).toBe(true);
@@ -136,6 +136,29 @@ describe("searchPerplexity", () => {
       params: { is_incognito: boolean };
     };
     expect(body.params.is_incognito).toBe(true);
+  });
+
+  test("cancels the response body after a terminal event", async () => {
+    let cancelCalled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"status":"COMPLETED","final":true,"text":"answer"}\n\n'));
+      },
+      cancel() {
+        cancelCalled = true;
+      },
+    });
+
+    globalThis.fetch = (async () =>
+      new Response(stream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      })) as unknown as typeof fetch;
+
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+
+    expect(result.answer).toBe("answer");
+    expect(cancelCalled).toBe(true);
   });
 
   test("maps 401 and 403 responses to AUTH error", async () => {

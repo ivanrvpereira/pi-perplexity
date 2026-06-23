@@ -1,8 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "./test-helpers.js";
 
 describe("extension entrypoint", () => {
   test("registers the config command", async () => {
-    const { default: registerExtension } = await import(`../src/index.ts?test=${crypto.randomUUID()}`);
+    const { default: registerExtension } = await import(`../src/index.js?test=${crypto.randomUUID()}`);
 
     const commands: string[] = [];
 

@@ -3,8 +3,7 @@
 A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding agent real-time web search powered by your **Perplexity Pro or Max subscription**
 ## Requirements
 
-- [pi](https://github.com/badlogic/pi-mono) coding agent
-- [Bun](https://bun.sh) runtime (available on `PATH`)
+- [pi](https://github.com/badlogic/pi-mono) coding agent with its bundled Node runtime (Node 18.14.1+ if running outside pi)
 - A **Perplexity Pro** or **Max** subscription
 - macOS (for zero-interaction auth) _or_ an interactive terminal (for email OTP)
 
@@ -87,23 +86,21 @@ Queries default to `is_incognito: true`, but you can override that per call or v
 
 ## How It Works
 
-The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app or via email OTP. Responses stream as incremental events that are merged into a final result.
-
-When pi loads extensions under Node/jiti, direct `fetch` to Perplexity can get Cloudflare-challenged, so Perplexity network calls shell out to a Bun subprocess — that's the only reason Bun is required.
+The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app or via email OTP. Responses stream as incremental events that are merged into a final result. Network calls use the Node runtime already provided by pi; no extra runtime is required. Email OTP auth requires `Headers.getSetCookie()` support so auth cookies are exposed reliably.
 
 ## Development
 
 ```bash
-bun install        # Install dev dependencies
-bun test           # Run tests
-bunx tsc --noEmit  # Type check
+npm install          # Install dev dependencies
+npm test             # Run tests
+npm run typecheck    # Type check
 ```
 
 Optional live model-selection E2E test (requires cached auth from `/perplexity-login`):
 
 ```bash
-PI_PERPLEXITY_E2E=1 bun test test/e2e-models.test.ts
-PI_PERPLEXITY_E2E=1 PI_PERPLEXITY_E2E_MODELS=pplx_pro_upgraded,gpt54 bun test test/e2e-models.test.ts
+PI_PERPLEXITY_E2E=1 npm test
+PI_PERPLEXITY_E2E=1 PI_PERPLEXITY_E2E_MODELS=pplx_pro_upgraded,gpt54 npm test
 ```
 
 ## License

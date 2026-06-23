@@ -8,13 +8,13 @@ A **pi extension** (plugin for `@mariozechner/pi-coding-agent`) that provides we
 
 ```bash
 # Type check
-bunx tsc --noEmit
+npm run typecheck
 
 # Run tests
-bun test
+npm test
 
 # Quick smoke test — factory returns valid tool shape
-bun run --bun src/index.ts
+node --import @mariozechner/jiti/register --input-type=module -e "import('./src/index.ts').then((m)=>{ const entry = m.default?.default ?? m.default; if (typeof entry !== 'function') throw new Error('default export missing'); })"
 ```
 
 No build step. Extensions are loaded via jiti — TypeScript runs directly.
@@ -51,7 +51,7 @@ pi-perplexity/
 
 ### Zero Runtime Dependencies
 This plugin has **zero npm dependencies**. All HTTP, SSE parsing, JWT decoding, and UUID generation use platform globals:
-- `fetch` — global (Bun/Node 18+)
+- `fetch` — global (Node 18.14.1+ for `Headers.getSetCookie()` support)
 - `crypto.randomUUID()` — global
 - `atob` / `Buffer.from(payload, "base64url")` — global
 - `Intl.DateTimeFormat` — global
@@ -168,7 +168,7 @@ See `docs/design-decisions.md` for rationale on non-obvious choices.
 - Tool `execute` param order is `(toolCallId, params, signal, onUpdate, ctx)` — signal before onUpdate
 - The SSE stream is NOT standard Server-Sent Events — it uses `data:` lines with JSON but requires custom parsing for multi-line data fields and `[DONE]` marker
 - Perplexity SSE events are incremental snapshots, not deltas — each event contains the full state up to that point, but blocks must still be merged by `intended_usage` key
-- macOS `defaults read` via Bun shell (`Bun.$`) — handle non-zero exit code (app not installed) gracefully
+- macOS `defaults read` via `node:child_process` — handle non-zero exit code (app not installed) gracefully
 - JWT `exp` claim is in seconds, not milliseconds — multiply by 1000
-- Token file must be written with `0600` permissions — use `Bun.write()` and set mode
+- Token file must be written with `0600` permissions — use `node:fs/promises` and enforce mode on existing files
 - Always pass `AbortSignal` through to `fetch` for cancellation support

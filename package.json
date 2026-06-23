@@ -29,22 +29,20 @@
     "@mariozechner/pi-ai": "*",
     "@sinclair/typebox": "*"
   },
-  "dependencies": {
-    "bun": "^1.3.9"
-  },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*",
     "@mariozechner/pi-ai": "*",
     "@sinclair/typebox": "*",
-    "bun-types": "*",
+    "@types/node": "*",
     "typescript": "*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test:build": "node -e \"require('node:fs').rmSync('.tmp-test',{recursive:true,force:true})\" && tsc --project tsconfig.test.json",
+    "test": "npm run test:build && node --test --experimental-test-module-mocks \".tmp-test/test/**/*.test.js\""
   },
   "engines": {
-    "bun": ">=1.3.9"
+    "node": ">=18.14.1"
   }
 }

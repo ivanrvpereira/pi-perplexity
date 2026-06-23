@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Bun installed
+- Node/npm from pi available
 - oh-my-pi installed (for testing the plugin)
 - Perplexity macOS app installed and logged in (for Path 1 auth), OR a Perplexity account email (for Path 2 OTP auth)
 
@@ -92,7 +92,7 @@ export default factory;
 ```
 
 ### Acceptance
-- `bun run --bun src/index.ts` doesn't crash
+- `npm run typecheck` succeeds
 - Factory returns a valid CustomTool shape
 
 ---
@@ -121,12 +121,12 @@ interface StoredToken {
 }
 ```
 
-Use `Bun.write()` and `Bun.file()`. Handle ENOENT on read (no stored token).
+Use `node:fs/promises`. Handle ENOENT on read (no stored token).
 
 ### 2.3 Login flow (`src/auth/login.ts`)
 
 Implement:
-- `extractFromDesktopApp(): Promise<string | null>` — `defaults read ai.perplexity.mac authToken` via `Bun.$`. macOS only, returns null on other platforms or if app not installed.
+- `extractFromDesktopApp(): Promise<string | null>` — `defaults read ai.perplexity.mac authToken` via `node:child_process`. macOS only, returns null on other platforms or if app not installed.
 - `loginViaEmailOtp(promptFn): Promise<string>` — three-step HTTP flow (CSRF -> send OTP -> verify OTP). Uses `fetch` with the required headers.
 - `authenticate(promptFn): Promise<StoredToken>` — tries desktop extraction, falls back to email OTP, saves result.
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "./test-helpers.js";
 
 import { renderPerplexityCall } from "../src/render/call.js";
 import { renderPerplexityResult } from "../src/render/result.js";
@@ -12,7 +12,7 @@ describe("renderPerplexityCall", () => {
   test("shows the selected model in the tool call row", () => {
     const rendered = renderPerplexityCall(
       {
-        query: "latest bun release notes",
+        query: "latest Node release notes",
         model: "claude46sonnetthinking",
         recency: "week",
         limit: 5,

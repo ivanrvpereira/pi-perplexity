@@ -41,11 +41,11 @@ function buildAuthHeaders(includeJsonContentType = false): Record<string, string
   };
 }
 
-function parseJsonResponse(response: AuthFetchResponse): unknown {
+function parseJsonResponse(action: string, response: AuthFetchResponse): unknown {
   try {
     return JSON.parse(response.bodyText) as unknown;
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Error(`${action} returned invalid JSON: ${errorMessage(error)}`);
   }
 }
 
@@ -87,20 +87,25 @@ async function loginWithEmailOtp(
     throw new Error(formatHttpFailure("Failed to fetch CSRF token", csrfResponse));
   }
 
-  const csrfPayload = parseJsonResponse(csrfResponse) as { csrfToken?: unknown } | null;
+  const csrfPayload = parseJsonResponse("CSRF token response", csrfResponse);
   const csrfToken =
-    csrfPayload && typeof csrfPayload.csrfToken === "string" ? csrfPayload.csrfToken : null;
+    csrfPayload && typeof csrfPayload === "object" && !Array.isArray(csrfPayload)
+      ? (csrfPayload as Record<string, unknown>).csrfToken
+      : null;
 
-  if (!csrfToken) {
+  if (typeof csrfToken !== "string") {
     throw new Error("CSRF token missing from Perplexity auth response.");
   }
 
   const cookieHeader = cookieHeaderFrom(csrfResponse.cookies);
+  if (!cookieHeader) {
+    throw new Error(
+      "Perplexity auth response did not include Set-Cookie headers required for OTP login.",
+    );
+  }
 
   const emailHeaders = buildAuthHeaders(true);
-  if (cookieHeader) {
-    emailHeaders.Cookie = cookieHeader;
-  }
+  emailHeaders.Cookie = cookieHeader;
 
   const emailResponse = await fetchAuth(`${AUTH_BASE_URL}/signin-email`, {
     method: "POST",
@@ -125,9 +130,7 @@ async function loginWithEmailOtp(
   }
 
   const otpHeaders = buildAuthHeaders(true);
-  if (cookieHeader) {
-    otpHeaders.Cookie = cookieHeader;
-  }
+  otpHeaders.Cookie = cookieHeader;
 
   const otpResponse = await fetchAuth(`${AUTH_BASE_URL}/signin-otp`, {
     method: "POST",
@@ -140,7 +143,7 @@ async function loginWithEmailOtp(
     throw new Error(formatHttpFailure("OTP verification failed", otpResponse));
   }
 
-  const otpPayload = parseJsonResponse(otpResponse);
+  const otpPayload = parseJsonResponse("OTP verification response", otpResponse);
   const token = extractTokenFromPayload(otpPayload);
   if (!token) {
     throw new Error("Perplexity OTP response did not include a token.");

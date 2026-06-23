@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "../test-helpers.js";
 
 import { AuthError, type StoredToken } from "../../src/search/types.js";
 
@@ -17,8 +17,15 @@ function createOpaqueToken(): string {
   return "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0.part2.part3.part4.part5";
 }
 
+function csrfHeaders(): [string, string][] {
+  return [
+    ["content-type", "application/json"],
+    ["set-cookie", "next-auth.csrf-token=csrf-cookie; Path=/; HttpOnly"],
+  ];
+}
+
 async function importLoginModule() {
-  return import(`../../src/auth/login.ts?test=${crypto.randomUUID()}`);
+  return import(`../../src/auth/login.js?test=${crypto.randomUUID()}`);
 }
 
 function restoreEnv(): void {
@@ -178,7 +185,7 @@ describe("auth/login", () => {
       if (url.endsWith("/csrf")) {
         return new Response(JSON.stringify({ csrfToken: "csrf-token" }), {
           status: 200,
-          headers: { "content-type": "application/json" },
+          headers: csrfHeaders(),
         });
       }
 
@@ -221,6 +228,8 @@ describe("auth/login", () => {
 
     const signinEmailRequest = fetchMock.mock.calls[1]?.[1] as RequestInit;
     const signinOtpRequest = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(new Headers(signinEmailRequest.headers).get("Cookie")).toBe("next-auth.csrf-token=csrf-cookie");
+    expect(new Headers(signinOtpRequest.headers).get("Cookie")).toBe("next-auth.csrf-token=csrf-cookie");
     expect(JSON.parse(String(signinEmailRequest.body))).toEqual({
       email: "user@example.com",
       csrfToken: "csrf-token",

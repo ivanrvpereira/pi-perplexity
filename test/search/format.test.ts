@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "../test-helpers.js";
 
 import { formatForLLM } from "../../src/search/format.js";
 

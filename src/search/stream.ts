@@ -10,16 +10,13 @@ function parseEventPayload(payload: string): StreamEvent | null {
     return null;
   }
 
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (!isPlainObject(parsed)) {
-      return null;
-    }
-    // StreamEvent fields are all optional — any plain object is a valid shape.
-    return parsed as StreamEvent;
-  } catch {
-    return null;
+  const parsed: unknown = JSON.parse(trimmed);
+  if (!isPlainObject(parsed)) {
+    throw new Error("Perplexity stream event payload was not a JSON object.");
   }
+
+  // StreamEvent fields are all optional — any plain object is a valid shape.
+  return parsed as StreamEvent;
 }
 
 /** Parse SSE `data:` lines from a ReadableStream, yielding parsed StreamEvent objects. Handles multi-line payloads, `[DONE]` marker, and abort signal. */

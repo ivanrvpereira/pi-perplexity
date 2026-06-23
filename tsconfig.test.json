@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".tmp-test",
+    "rootDir": ".",
+    "sourceMap": false
+  },
+  "exclude": ["node_modules", ".tmp-test"]
+}

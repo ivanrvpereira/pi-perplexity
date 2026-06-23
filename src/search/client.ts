@@ -3,19 +3,8 @@ import type { SearchResult, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
 import { errorMessage } from "../render/util.js";
 import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
-import { perplexityFetchText } from "../perplexity-fetch.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
-
-function streamFromText(text: string): ReadableStream<Uint8Array> {
-  const bytes = new TextEncoder().encode(text);
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
-}
 
 export interface SearchParams {
   query: string;
@@ -178,6 +167,7 @@ function mapHttpError(status: number): SearchError {
     `Perplexity request failed with HTTP ${status}. Check connectivity and retry.`,
   );
 }
+
 /** Execute a Perplexity search: POST SSE, stream/merge events, extract answer + sources. Throws SearchError on failure. */
 export async function searchPerplexity(
   params: SearchParams,
@@ -188,77 +178,57 @@ export async function searchPerplexity(
   const requestBody = buildRequestBody(params);
   const requestHeaders = buildRequestHeaders(jwt, requestId);
 
-  let eventStream: ReadableStream<Uint8Array>;
-
-  if (typeof Bun === "undefined") {
-    let response: { status: number; bodyText: string };
-    try {
-      response = await perplexityFetchText(PERPLEXITY_ENDPOINT, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-        signal: signal ?? null,
-      });
-    } catch (error) {
-      if (signal?.aborted) {
-        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
-      }
-
-      throw new SearchError(
-        "NETWORK",
-        `Could not connect to Perplexity. ${errorMessage(error)}`,
-      );
+  let response: Response;
+  try {
+    response = await fetch(PERPLEXITY_ENDPOINT, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
+      signal: signal ?? null,
+    });
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new SearchError("NETWORK", "Perplexity request was cancelled.");
     }
 
-    if (response.status === 0) {
-      throw new SearchError("NETWORK", response.bodyText);
-    }
-    if (response.status !== 200) {
-      throw mapHttpError(response.status);
-    }
-    if (!response.bodyText) {
-      throw new SearchError("STREAM", "Perplexity returned an empty response.");
-    }
-
-    eventStream = streamFromText(response.bodyText);
-  } else {
-    let response: Response;
-    try {
-      response = await fetch(PERPLEXITY_ENDPOINT, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-        signal: signal ?? null,
-      });
-    } catch (error) {
-      if (signal?.aborted) {
-        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
-      }
-
-      throw new SearchError(
-        "NETWORK",
-        `Could not connect to Perplexity. ${errorMessage(error)}`,
-      );
-    }
-
-    if (!response.ok) {
-      throw mapHttpError(response.status);
-    }
-
-    if (!response.body) {
-      throw new SearchError("STREAM", "Perplexity returned an empty stream body.");
-    }
-
-    eventStream = response.body;
+    throw new SearchError(
+      "NETWORK",
+      `Could not connect to Perplexity. ${errorMessage(error)}`,
+    );
   }
 
+  if (!response.ok) {
+    throw mapHttpError(response.status);
+  }
+
+  if (!response.body) {
+    throw new SearchError("STREAM", "Perplexity returned an empty stream body.");
+  }
+
+  const eventStream = response.body;
+
   let snapshot: StreamEvent = {};
+  let shouldCancelStream = true;
+  let stoppedAtTerminalEvent = false;
 
   try {
-    for await (const event of readSseEvents(eventStream, signal)) {
-      snapshot = mergeEvent(snapshot, event);
-      if (event.final || event.status === "COMPLETED") {
-        break;
+    try {
+      for await (const event of readSseEvents(eventStream, signal)) {
+        snapshot = mergeEvent(snapshot, event);
+        if (event.final || event.status === "COMPLETED") {
+          stoppedAtTerminalEvent = true;
+          break;
+        }
+      }
+
+      if (signal?.aborted) {
+        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
+      }
+
+      shouldCancelStream = stoppedAtTerminalEvent;
+    } finally {
+      if (shouldCancelStream && !signal?.aborted) {
+        await eventStream.cancel();
       }
     }
   } catch (error) {
@@ -272,7 +242,7 @@ export async function searchPerplexity(
 
     throw new SearchError(
       "STREAM",
-      `Failed to parse Perplexity stream: ${errorMessage(error)}`,
+      `Failed to read Perplexity stream: ${errorMessage(error)}`,
     );
   }
 

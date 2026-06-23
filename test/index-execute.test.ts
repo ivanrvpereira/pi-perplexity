@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "./test-helpers.js";
 
 afterEach(() => {
   mock.restore();
@@ -25,7 +25,7 @@ describe("perplexity_search execute", () => {
     }));
     mock.module("../src/search/client.js", () => ({ searchPerplexity }));
 
-    const { default: registerExtension } = await import(`../src/index.ts?test=${crypto.randomUUID()}`);
+    const { default: registerExtension } = await import(`../src/index.js?test=${crypto.randomUUID()}`);
 
     let execute: ((toolCallId: string, params: any, signal?: AbortSignal, onUpdate?: any, ctx?: any) => Promise<any>) | undefined;
     let parameters: unknown;

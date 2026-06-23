@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Removed the Bun runtime dependency; Perplexity requests now use pi's Node runtime and development uses npm scripts.
+
+### Fixed
+
+- Require reliable `Set-Cookie` access for email OTP auth instead of silently dropping auth cookies on unsupported Node fetch runtimes.
+- Cancel the Perplexity search response stream after terminal SSE events to avoid leaving fetch bodies open.
+
 ## [0.2.2] - 2026-06-22
 
 ### Fixed
