@@ -8,7 +8,11 @@ import {
 } from "../config.js";
 import { KNOWN_MODELS } from "../search/models.js";
 
-function formatCurrentConfig(config: { model?: string }): string {
+interface CurrentConfigView {
+  model?: string;
+}
+
+function formatCurrentConfig(config: CurrentConfigView): string {
   const model = config.model ?? "pplx_pro_upgraded (default)";
   const modelLabel = KNOWN_MODELS.find((m) => m.value === config.model)?.label;
   return `Model: ${modelLabel ? `${model} (${modelLabel})` : model}`;

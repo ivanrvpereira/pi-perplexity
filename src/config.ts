@@ -49,6 +49,7 @@ export async function saveConfig(config: PerplexityConfig, configPath: string = 
 /** Resolve the search model using priority: env var > config file > default. */
 export function resolveSearchModel(config: PerplexityConfig): string {
   const envModel = process.env.PI_PERPLEXITY_MODEL?.trim() || undefined;
+  const configModel = config.model?.trim() || undefined;
 
-  return envModel ?? config.model ?? "pplx_pro_upgraded";
+  return envModel ?? configModel ?? "pplx_pro_upgraded";
 }

@@ -165,6 +165,16 @@ describe("searchPerplexity", () => {
     );
   });
 
+  test("maps premature stream EOF to a typed stream error", async () => {
+    globalThis.fetch = (async () =>
+      createSseResponse([{ text: "partial answer" }])) as unknown as typeof fetch;
+
+    await assert.rejects(
+      searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt"),
+      (error) => error instanceof SearchError && error.code === "STREAM",
+    );
+  });
+
   test("maps 401/403 and 429 responses to typed errors", async () => {
     for (const status of [401, 403] as const) {
       globalThis.fetch = (async () => new Response("auth fail", { status })) as unknown as typeof fetch;

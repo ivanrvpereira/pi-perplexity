@@ -80,6 +80,8 @@ describe("resolveSearchModel", () => {
     try {
       assert.equal(resolveSearchModel({}), "pplx_pro_upgraded");
       assert.equal(resolveSearchModel({ model: "gpt54" }), "gpt54");
+      assert.equal(resolveSearchModel({ model: " gpt54 " }), "gpt54");
+      assert.equal(resolveSearchModel({ model: "   " }), "pplx_pro_upgraded");
 
       process.env.PI_PERPLEXITY_MODEL = "experimental";
       assert.equal(resolveSearchModel({ model: "gpt54" }), "experimental");

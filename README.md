@@ -82,7 +82,7 @@ Provider: perplexity (oauth)
 Model: pplx_pro_upgraded
 ```
 
-Queries always use `is_incognito: true` so the extension does not write to your Perplexity history.
+Queries always send the observed `is_incognito: true` flag, which is intended to avoid writing to your Perplexity history. Because this uses a reverse-engineered internal endpoint, it is not a guarantee about Perplexity's server-side retention.
 
 ## How It Works
 

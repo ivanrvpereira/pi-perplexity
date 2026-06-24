@@ -233,6 +233,10 @@ export async function searchPerplexity(
       throw new SearchError("NETWORK", "Perplexity request was cancelled.");
     }
 
+    if (!stoppedAtTerminalEvent) {
+      throw new SearchError("STREAM", "Perplexity stream ended before a terminal event.");
+    }
+
     shouldCancelStream = stoppedAtTerminalEvent;
   } catch (error) {
     if (error instanceof SearchError) {
