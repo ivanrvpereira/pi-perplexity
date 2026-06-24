@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+import { browserLoginInstructions } from "../auth/browser.js";
 import { authenticate, saveBrowserAuthInput } from "../auth/login.js";
 import { clearToken } from "../auth/storage.js";
 import { AuthError } from "../search/types.js";
@@ -49,21 +50,6 @@ function parseCommandArgs(args: string): ParsedCommandArgs {
 
 function usageText(): string {
   return `Usage: /${LOGIN_COMMAND_NAME} [--force] [--browser]\n\nFlags:\n  --force, --refresh, -f   Clear cached token before login\n  --browser, --cookie      Import browser auth by pasting Copy as cURL, a Cookie header, or a session token\n  --help, -h               Show this help`;
-}
-
-function browserLoginInstructions(): string {
-  return [
-    "Browser login:",
-    "1. Open https://www.perplexity.ai and sign in.",
-    "2. Open DevTools → Network.",
-    "3. Reload the page or ask one Perplexity question.",
-    "4. Right-click a www.perplexity.ai request → Copy → Copy as cURL.",
-    "5. Paste the copied cURL command here.",
-    "",
-    "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-next-auth.session-token.",
-    "If it does not, copy a different www.perplexity.ai request, preferably perplexity_ask.",
-    "Alternatives: paste the request Cookie header, or paste the __Secure-next-auth.session-token value.",
-  ].join("\n");
 }
 
 export function registerPerplexityCommands(pi: ExtensionAPI): void {

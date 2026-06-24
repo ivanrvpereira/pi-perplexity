@@ -5,8 +5,8 @@ import { Type } from "@sinclair/typebox";
 import { registerPerplexityConfigCommand } from "./commands/config.js";
 import { registerPerplexityCommands } from "./commands/login.js";
 
+import { browserLoginInstructions } from "./auth/browser.js";
 import { authenticate } from "./auth/login.js";
-import { clearToken } from "./auth/storage.js";
 import { loadConfig, resolveSearchDefaults } from "./config.js";
 import { formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
@@ -59,21 +59,7 @@ export default function (pi: ExtensionAPI) {
           promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
           promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
           promptForBrowserAuth: async () => {
-            ctx?.ui?.notify?.(
-              [
-                "Browser login needed:",
-                "1. Open https://www.perplexity.ai and sign in.",
-                "2. Open DevTools → Network.",
-                "3. Reload the page or ask one Perplexity question.",
-                "4. Right-click a www.perplexity.ai request → Copy → Copy as cURL.",
-                "5. Paste the copied cURL command here.",
-                "",
-                "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-next-auth.session-token.",
-                "If it does not, copy a different www.perplexity.ai request, preferably perplexity_ask.",
-                "Alternatives: paste the request Cookie header, or paste the __Secure-next-auth.session-token value.",
-              ].join("\n"),
-              "info",
-            );
+            ctx?.ui?.notify?.(browserLoginInstructions(), "info");
             return promptInput(
               "Paste copied cURL command or Cookie header",
               "curl 'https://www.perplexity.ai/' -H 'Cookie: ...'",
@@ -140,10 +126,6 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (error instanceof SearchError) {
-          if (error.code === "AUTH") {
-            // Clear cached token on auth rejection so next call triggers re-login.
-            await clearToken().catch(() => undefined);
-          }
           return {
             content: [{ type: "text", text: `Perplexity search failed: ${error.message}` }],
             details: { sourceCount, queryMs, isError: true },
