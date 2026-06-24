@@ -1,9 +1,10 @@
-import { describe, expect, test } from "./test-helpers.js";
+import assert from "node:assert/strict";
+
+import { describe, test } from "./test-helpers.js";
 
 describe("extension entrypoint", () => {
   test("registers the config command", async () => {
     const { default: registerExtension } = await import(`../src/index.js?test=${crypto.randomUUID()}`);
-
     const commands: string[] = [];
 
     registerExtension({
@@ -15,7 +16,7 @@ describe("extension entrypoint", () => {
       },
     } as any);
 
-    expect(commands).toContain("perplexity-login");
-    expect(commands).toContain("perplexity-config");
+    assert.ok(commands.includes("perplexity-login"));
+    assert.ok(commands.includes("perplexity-config"));
   });
 });

@@ -1,5 +1,6 @@
-import { describe, expect, test } from "./test-helpers.js";
+import assert from "node:assert/strict";
 
+import { describe, test } from "./test-helpers.js";
 import { renderPerplexityCall } from "../src/render/call.js";
 import { renderPerplexityResult } from "../src/render/result.js";
 
@@ -9,20 +10,22 @@ const theme = {
 } as any;
 
 describe("renderPerplexityCall", () => {
-  test("shows the selected model in the tool call row", () => {
+  test("shows query filters without stale model or incognito fields", () => {
     const rendered = renderPerplexityCall(
       {
         query: "latest Node release notes",
         model: "claude46sonnetthinking",
+        incognito: false,
         recency: "week",
         limit: 5,
-      },
+      } as any,
       theme,
     ).render(200).join("\n");
 
-    expect(rendered).toContain("claude46sonnetthinking");
-    expect(rendered).toContain("week");
-    expect(rendered).toContain("limit 5");
+    assert.match(rendered, /latest Node release notes/);
+    assert.match(rendered, /week/);
+    assert.match(rendered, /limit 5/);
+    assert.doesNotMatch(rendered, /claude46sonnetthinking|incognito/);
   });
 });
 
@@ -41,7 +44,7 @@ describe("renderPerplexityResult", () => {
       theme,
     ).render(200).join("\n");
 
-    expect(rendered).toContain("gpt54");
-    expect(rendered).toContain("3 sources");
+    assert.match(rendered, /gpt54/);
+    assert.match(rendered, /3 sources/);
   });
 });

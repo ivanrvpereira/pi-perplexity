@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, mock, test } from "../test-helpers.js";
+import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
+import { afterEach, describe, mock, test } from "../test-helpers.js";
 
 async function importStorageModule() {
   return import(`../../src/auth/storage.js?test=${crypto.randomUUID()}`);
@@ -17,9 +19,7 @@ describe("auth/storage", () => {
     const tokenPath = join(homeDir, ".config", "pi-perplexity", "auth.json");
 
     try {
-      mock.module("node:os", () => ({
-        homedir: () => homeDir,
-      }));
+      mock.module("node:os", () => ({ homedir: () => homeDir }));
 
       await mkdir(dirname(tokenPath), { recursive: true });
       await writeFile(tokenPath, '{"type":"oauth","access":"old"}\n', {
@@ -30,15 +30,11 @@ describe("auth/storage", () => {
       const { saveToken } = await importStorageModule();
       await saveToken({ type: "oauth", access: "new-token" });
 
-      const fileMode = (await stat(tokenPath)).mode & 0o777;
-      expect(fileMode).toBe(0o600);
-
-      const saved = JSON.parse(await readFile(tokenPath, "utf8")) as {
-        type: string;
-        access: string;
-      };
-      expect(saved.type).toBe("oauth");
-      expect(saved.access).toBe("new-token");
+      assert.equal((await stat(tokenPath)).mode & 0o777, 0o600);
+      assert.deepEqual(JSON.parse(await readFile(tokenPath, "utf8")), {
+        type: "oauth",
+        access: "new-token",
+      });
     } finally {
       await rm(homeDir, { recursive: true, force: true });
     }

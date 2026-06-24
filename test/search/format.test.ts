@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "../test-helpers.js";
+import assert from "node:assert/strict";
 
+import { afterEach, beforeEach, describe, test } from "../test-helpers.js";
 import { formatForLLM } from "../../src/search/format.js";
 
 const NOW = Date.UTC(2026, 1, 16, 12, 0, 0);
@@ -36,13 +37,13 @@ describe("formatForLLM", () => {
       uuid: "req-123",
     });
 
-    expect(output).toContain("## Answer");
-    expect(output).toContain("## Sources");
-    expect(output).toContain("## Meta");
-    expect(output.indexOf("[1] Source 1")).toBeLessThan(output.indexOf("[2] Source 2"));
-    expect(output).toContain("Provider: perplexity (oauth)");
-    expect(output).toContain("Model: pplx_pro_upgraded");
-    expect(output).toContain("Request ID: req-123");
+    assert.match(output, /## Answer/);
+    assert.match(output, /## Sources/);
+    assert.match(output, /## Meta/);
+    assert.ok(output.indexOf("[1] Source 1") < output.indexOf("[2] Source 2"));
+    assert.match(output, /Provider: perplexity \(oauth\)/);
+    assert.match(output, /Model: pplx_pro_upgraded/);
+    assert.match(output, /Request ID: req-123/);
   });
 
   test("humanizes source ages", () => {
@@ -76,22 +77,20 @@ describe("formatForLLM", () => {
       ],
     });
 
-    expect(output).toContain("Recent (just now)");
-    expect(output).toContain("Minutes (12m ago)");
-    expect(output).toContain("Hours (5h ago)");
-    expect(output).toContain("Days (3d ago)");
+    assert.match(output, /Recent \(just now\)/);
+    assert.match(output, /Minutes \(12m ago\)/);
+    assert.match(output, /Hours \(5h ago\)/);
+    assert.match(output, /Days \(3d ago\)/);
   });
 
   test("truncates snippets to 240 chars", () => {
-    const longSnippet = "x".repeat(300);
-
     const output = formatForLLM({
       answer: "Snippet test",
       sources: [
         {
           name: "Long snippet",
           url: "https://example.com/long",
-          snippet: longSnippet,
+          snippet: "x".repeat(300),
         },
       ],
     });
@@ -100,8 +99,8 @@ describe("formatForLLM", () => {
       .split("\n")
       .find((line) => line.startsWith("    ") && line.includes("…"));
 
-    expect(snippetLine).toBeDefined();
-    expect(snippetLine!.trim().length).toBe(240);
+    assert.ok(snippetLine);
+    assert.equal(snippetLine.trim().length, 240);
   });
 
   test("handles empty source list", () => {
@@ -110,7 +109,7 @@ describe("formatForLLM", () => {
       sources: [],
     });
 
-    expect(output).toContain("0 sources");
-    expect(output).toContain("(no sources returned)");
+    assert.match(output, /0 sources/);
+    assert.match(output, /\(no sources returned\)/);
   });
 });

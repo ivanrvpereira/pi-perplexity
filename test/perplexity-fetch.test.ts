@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, mock, test } from "./test-helpers.js";
+import assert from "node:assert/strict";
 
+import { afterEach, describe, mock, test } from "./test-helpers.js";
 import { perplexityFetchText } from "../src/perplexity-fetch.js";
 
 const originalFetch = globalThis.fetch;
@@ -31,10 +32,10 @@ describe("perplexityFetchText", () => {
       headers: {},
     });
 
-    expect(response.ok).toBe(true);
-    expect(response.status).toBe(200);
-    expect(response.bodyText).toBe("ok");
-    expect(response.cookies).toEqual([
+    assert.equal(response.ok, true);
+    assert.equal(response.status, 200);
+    assert.equal(response.bodyText, "ok");
+    assert.deepEqual(response.cookies, [
       "first=1; Path=/; HttpOnly",
       "second=2; Path=/; Secure",
     ]);
@@ -49,8 +50,9 @@ describe("perplexityFetchText", () => {
 
     globalThis.fetch = mock(async () => new Response("ok", { status: 200 })) as unknown as typeof fetch;
 
-    await expect(perplexityFetchText("https://example.com", { method: "GET", headers: {} })).rejects.toThrow(
-      "Headers.getSetCookie",
+    await assert.rejects(
+      perplexityFetchText("https://example.com", { method: "GET", headers: {} }),
+      /Headers\.getSetCookie/,
     );
   });
 });

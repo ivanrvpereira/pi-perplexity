@@ -26,11 +26,8 @@ pi-perplexity/
   package.json              # pi extension manifest (see "omp"/"pi" field)
   tsconfig.json
   AGENTS.md                 # You are here
-  architecture.md           # Full protocol spec — SSE format, auth flows, event schemas
-  plan.md                   # Implementation phases and acceptance criteria
   docs/
-    pi_docs_extension.md    # Official pi extension system documentation
-    pi_platform_reference.md # Pi platform reference (SDK, RPC, sessions, settings, packages)
+    design-decisions.md     # Rationale for non-obvious behavior
   src/
     index.ts                # CustomToolFactory entry — default export
     auth/
@@ -67,7 +64,7 @@ These are bundled by pi and must go in `peerDependencies` with `"*"` range:
 The Perplexity SSE endpoint is **not a public API**. It can break without notice.
 - Keep types loose — all fields optional
 - Keep the client thin — minimal assumptions about response shape
-- Specific User-Agent and headers are required (see architecture.md § Request)
+- Specific User-Agent and headers are required (see `src/search/client.ts`)
 - `is_incognito: true` always — don't pollute user's Perplexity history
 
 ## Coding Conventions
@@ -94,7 +91,7 @@ The Perplexity SSE endpoint is **not a public API**. It can break without notice
 ### Error Handling
 - Never throw raw errors from tool execute — always return error text in `content`
 - Use a `SearchError` class for typed errors with code and message
-- HTTP 401/403: clear stored token, return auth error to agent
+- HTTP 401/403: return an auth error telling the user to run `/perplexity-login --force`; do not clear stored tokens as a hidden side effect
 - HTTP 429: return rate limit message with retry suggestion
 - Network failures: return error text, don't crash
 - Empty responses: return "No results found"
@@ -106,7 +103,7 @@ The Perplexity SSE endpoint is **not a public API**. It can break without notice
    - Skip if `PI_AUTH_NO_BORROW=1` is set
    - Returns null on non-macOS or if app not installed
 2. **Email OTP** (interactive fallback): CSRF → send OTP → verify OTP
-   - Uses `ctx.ui.input()` for OTP prompt
+  - Uses `ctx.ui.input()` for email and OTP prompts
 
 Token stored at `~/.config/pi-perplexity/auth.json` with `0600` permissions.
 JWT expiry: `decoded.exp * 1000 - 5min` buffer. No auto-refresh — re-login on expiry.
@@ -126,7 +123,7 @@ Stream terminates when `event.final === true` or `event.status === "COMPLETED"`.
 Answer extraction priority: markdown blocks → ask_text blocks → event.text fallback.
 Source extraction priority: web_results block → sources_list fallback. Deduplicate by URL.
 
-Full protocol details: `architecture.md` § Search Protocol, § Response: SSE Event Stream.
+Keep protocol assumptions close to `src/search/client.ts`, `src/search/stream.ts`, and fixture-backed tests.
 
 ## Tool Output Format
 
@@ -153,10 +150,10 @@ Model: <display_model>
 
 | What | Where |
 |------|-------|
-| Full protocol spec (headers, body, SSE events) | `architecture.md` |
-| Implementation phases and acceptance criteria | `plan.md` |
-| Pi extension system overview | `docs/pi_docs_extension.md` |
-| Pi platform reference (SDK, RPC, sessions, settings, packages) | `docs/pi_platform_reference.md` |
+| Auth side effects and other rationale | `docs/design-decisions.md` |
+| Request body, headers, answer/source extraction | `src/search/client.ts` |
+| SSE parser and incremental merge behavior | `src/search/stream.ts` |
+| Protocol fixtures and regression coverage | `test/fixtures/`, `test/search/` |
 
 ## Design Decisions
 

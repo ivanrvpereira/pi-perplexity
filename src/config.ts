@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 
 export interface PerplexityConfig {
   model?: string;
-  incognito?: boolean;
 }
 
 const CONFIG_PATH = join(homedir(), ".config", "pi-perplexity", "config.json");
@@ -25,7 +24,6 @@ function parseConfig(raw: string): PerplexityConfig {
   const obj = parsed as Record<string, unknown>;
   const config: PerplexityConfig = {};
   if (typeof obj.model === "string" && obj.model.length > 0) config.model = obj.model;
-  if (typeof obj.incognito === "boolean") config.incognito = obj.incognito;
   return config;
 }
 
@@ -48,26 +46,9 @@ export async function saveConfig(config: PerplexityConfig, configPath: string = 
   await chmod(configPath, 0o600);
 }
 
-/**
- * Resolve effective values using priority: per-call param > env var > config file > default.
- * Returns the model and incognito values to use for a search.
- */
-export function resolveSearchDefaults(
-  params: { model?: string; incognito?: boolean },
-  config: PerplexityConfig,
-): { model: string; incognito: boolean } {
+/** Resolve the search model using priority: env var > config file > default. */
+export function resolveSearchModel(config: PerplexityConfig): string {
   const envModel = process.env.PI_PERPLEXITY_MODEL?.trim() || undefined;
-  const envIncognito = process.env.PI_PERPLEXITY_INCOGNITO || undefined;
 
-  const model = params.model
-    ?? envModel
-    ?? config.model
-    ?? "pplx_pro_upgraded";
-
-  const incognito = params.incognito
-    ?? (envIncognito !== undefined ? envIncognito !== "false" && envIncognito !== "0" : undefined)
-    ?? config.incognito
-    ?? true;
-
-  return { model, incognito };
+  return envModel ?? config.model ?? "pplx_pro_upgraded";
 }

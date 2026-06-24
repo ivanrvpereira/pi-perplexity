@@ -9,9 +9,7 @@ const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
 export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
-  limit?: number;
   model: string;
-  incognito: boolean;
 }
 
 function normalizeUrl(url: string): string {
@@ -125,7 +123,7 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
       language: "en-US",
       timezone,
       search_recency_filter: params.recency ?? null,
-      is_incognito: params.incognito,
+      is_incognito: true,
       use_schematized_api: true,
       skip_search_enabled: true,
     },
@@ -151,7 +149,7 @@ function mapHttpError(status: number): SearchError {
   if (status === 401 || status === 403) {
     return new SearchError(
       "AUTH",
-      "Perplexity rejected authentication (401/403). Sign in to Perplexity desktop app and retry.",
+      "Perplexity rejected authentication (401/403). Run /perplexity-login --force to refresh credentials.",
     );
   }
 
@@ -166,6 +164,17 @@ function mapHttpError(status: number): SearchError {
     "NETWORK",
     `Perplexity request failed with HTTP ${status}. Check connectivity and retry.`,
   );
+}
+
+async function cancelEventStream(eventStream: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    await eventStream.cancel();
+  } catch (error) {
+    throw new SearchError(
+      "STREAM",
+      `Failed to close Perplexity stream: ${errorMessage(error)}`,
+    );
+  }
 }
 
 /** Execute a Perplexity search: POST SSE, stream/merge events, extract answer + sources. Throws SearchError on failure. */
@@ -212,25 +221,19 @@ export async function searchPerplexity(
   let stoppedAtTerminalEvent = false;
 
   try {
-    try {
-      for await (const event of readSseEvents(eventStream, signal)) {
-        snapshot = mergeEvent(snapshot, event);
-        if (event.final || event.status === "COMPLETED") {
-          stoppedAtTerminalEvent = true;
-          break;
-        }
-      }
-
-      if (signal?.aborted) {
-        throw new SearchError("NETWORK", "Perplexity request was cancelled.");
-      }
-
-      shouldCancelStream = stoppedAtTerminalEvent;
-    } finally {
-      if (shouldCancelStream && !signal?.aborted) {
-        await eventStream.cancel();
+    for await (const event of readSseEvents(eventStream, signal)) {
+      snapshot = mergeEvent(snapshot, event);
+      if (event.final || event.status === "COMPLETED") {
+        stoppedAtTerminalEvent = true;
+        break;
       }
     }
+
+    if (signal?.aborted) {
+      throw new SearchError("NETWORK", "Perplexity request was cancelled.");
+    }
+
+    shouldCancelStream = stoppedAtTerminalEvent;
   } catch (error) {
     if (error instanceof SearchError) {
       throw error;
@@ -244,6 +247,10 @@ export async function searchPerplexity(
       "STREAM",
       `Failed to read Perplexity stream: ${errorMessage(error)}`,
     );
+  } finally {
+    if (shouldCancelStream && !signal?.aborted) {
+      await cancelEventStream(eventStream);
+    }
   }
 
   if (snapshot.error_code || snapshot.error_message) {

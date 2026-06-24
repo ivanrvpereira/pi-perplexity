@@ -1,7 +1,7 @@
+import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import { describe, expect, test } from "../test-helpers.js";
-
+import { describe, test } from "../test-helpers.js";
 import { mergeEvent, mergeMarkdownBlock, readSseEvents } from "../../src/search/stream.js";
 import type { StreamEvent } from "../../src/search/types.js";
 
@@ -31,11 +31,11 @@ describe("SSE stream parsing", () => {
     const fixture = await readFile("test/fixtures/sse-basic.txt", "utf8");
     const events = await collectEvents(streamFromString(fixture, 5));
 
-    expect(events).toHaveLength(2);
-    expect(events[0].status).toBe("IN_PROGRESS");
-    expect(events[0].text).toBe("partial");
-    expect(events[1].status).toBe("COMPLETED");
-    expect(events[1].final).toBe(true);
+    assert.equal(events.length, 2);
+    assert.equal(events[0]?.status, "IN_PROGRESS");
+    assert.equal(events[0]?.text, "partial");
+    assert.equal(events[1]?.status, "COMPLETED");
+    assert.equal(events[1]?.final, true);
   });
 
   test("throws on invalid JSON payloads", async () => {
@@ -48,7 +48,7 @@ describe("SSE stream parsing", () => {
       "",
     ].join("\n");
 
-    await expect(collectEvents(streamFromString(payload))).rejects.toThrow(SyntaxError);
+    await assert.rejects(collectEvents(streamFromString(payload)), SyntaxError);
   });
 });
 
@@ -65,8 +65,8 @@ describe("event merging", () => {
       },
     );
 
-    expect(merged.chunks).toEqual(["Hello ", "world"]);
-    expect(merged.answer).toBe("Hello world");
+    assert.deepEqual(merged.chunks, ["Hello ", "world"]);
+    assert.equal(merged.answer, "Hello world");
   });
 
   test("mergeEvent preserves and accumulates sources_list", () => {
@@ -75,14 +75,14 @@ describe("event merging", () => {
       { text: "step 1" },
     );
 
-    expect(first.sources_list).toEqual([{ title: "A", url: "https://a.example" }]);
+    assert.deepEqual(first.sources_list, [{ title: "A", url: "https://a.example" }]);
 
     const second = mergeEvent(first, {
       sources_list: [{ title: "B", url: "https://b.example" }],
       status: "COMPLETED",
     });
 
-    expect(second.sources_list).toEqual([
+    assert.deepEqual(second.sources_list, [
       { title: "A", url: "https://a.example" },
       { title: "B", url: "https://b.example" },
     ]);
@@ -99,9 +99,9 @@ describe("event merging", () => {
     const markdown = snapshot.blocks?.find((block) => block.intended_usage === "markdown_block")
       ?.markdown_block;
 
-    expect(markdown?.chunks).toEqual(["Hello ", "world"]);
-    expect(markdown?.answer).toBe("Hello world");
-    expect(snapshot.display_model).toBe("pplx_pro_upgraded");
-    expect(snapshot.uuid).toBe("req-incremental");
+    assert.deepEqual(markdown?.chunks, ["Hello ", "world"]);
+    assert.equal(markdown?.answer, "Hello world");
+    assert.equal(snapshot.display_model, "pplx_pro_upgraded");
+    assert.equal(snapshot.uuid, "req-incremental");
   });
 });

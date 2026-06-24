@@ -1,5 +1,6 @@
-import { describe, expect, test } from "./test-helpers.js";
+import assert from "node:assert/strict";
 
+import { describe, test } from "./test-helpers.js";
 import { loadToken } from "../src/auth/storage.js";
 import { searchPerplexity } from "../src/search/client.js";
 
@@ -50,14 +51,12 @@ describe("Perplexity model selection e2e", () => {
           {
             query: "Say exactly OK",
             model,
-            incognito: true,
-            limit: 1,
           },
           token.access,
         );
 
-        expect(result.answer.trim().startsWith("OK")).toBe(true);
-        expect(result.displayModel).toBe(model);
+        assert.equal(result.answer.trim().startsWith("OK"), true);
+        assert.equal(result.displayModel, model);
 
         if (delayMs > 0 && model !== models.at(-1)) {
           await delay(delayMs);

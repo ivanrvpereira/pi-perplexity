@@ -6,8 +6,7 @@ import { registerPerplexityConfigCommand } from "./commands/config.js";
 import { registerPerplexityCommands } from "./commands/login.js";
 
 import { authenticate } from "./auth/login.js";
-import { clearToken } from "./auth/storage.js";
-import { loadConfig, resolveSearchDefaults } from "./config.js";
+import { loadConfig, resolveSearchModel } from "./config.js";
 import { formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
@@ -32,7 +31,6 @@ export default function (pi: ExtensionAPI) {
       limit: Type.Optional(
         Type.Number({ description: "Max sources to return", minimum: 1, maximum: 50 }),
       ),
-      incognito: Type.Optional(Type.Boolean({ description: "Hide search from Perplexity history" })),
     }),
     renderCall: renderPerplexityCall,
     renderResult: renderPerplexityResult,
@@ -73,20 +71,13 @@ export default function (pi: ExtensionAPI) {
         });
 
         const config = await loadConfig();
-        const { model, incognito } = resolveSearchDefaults(
-          {
-            ...(params.incognito !== undefined ? { incognito: params.incognito } : {}),
-          },
-          config,
-        );
+        const model = resolveSearchModel(config);
 
         const result = await searchPerplexity(
           {
             query: params.query,
             model,
-            incognito,
             ...(params.recency !== undefined ? { recency: params.recency } : {}),
-            ...(params.limit !== undefined ? { limit: params.limit } : {}),
           },
           jwt,
           signal,
@@ -102,7 +93,6 @@ export default function (pi: ExtensionAPI) {
           content: [{ type: "text", text: formatted }],
           details: {
             model: result.displayModel,
-            incognito,
             sourceCount,
             queryMs: Date.now() - start,
             uuid: result.uuid,
@@ -119,10 +109,6 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (error instanceof SearchError) {
-          if (error.code === "AUTH") {
-            // Clear cached token on auth rejection so next call triggers re-login.
-            await clearToken().catch(() => undefined);
-          }
           return {
             content: [{ type: "text", text: `Perplexity search failed: ${error.message}` }],
             details: { sourceCount, queryMs, isError: true },

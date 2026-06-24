@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "../test-helpers.js";
+import assert from "node:assert/strict";
 
+import { afterEach, beforeEach, describe, test } from "../test-helpers.js";
 import { SearchError } from "../../src/search/types.js";
 
 let searchPerplexity: typeof import("../../src/search/client.js").searchPerplexity;
@@ -20,7 +21,7 @@ describe("searchPerplexity", () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(async () => {
-    const mod = await import(`../../src/search/client.js?t=${Date.now()}`);
+    const mod = await import(`../../src/search/client.js?t=${crypto.randomUUID()}`);
     searchPerplexity = mod.searchPerplexity;
   });
 
@@ -28,7 +29,7 @@ describe("searchPerplexity", () => {
     globalThis.fetch = originalFetch;
   });
 
-  test("builds request body and headers according to protocol", async () => {
+  test("builds the request body and headers according to protocol", async () => {
     let capturedUrl: RequestInfo | URL | undefined;
     let capturedInit: RequestInit | undefined;
 
@@ -46,7 +47,12 @@ describe("searchPerplexity", () => {
               intended_usage: "web_results",
               web_result_block: {
                 web_results: [
-                  { name: "Source", url: "https://example.com", snippet: "snippet", timestamp: "2026-02-16T10:00:00.000Z" },
+                  {
+                    name: "Source",
+                    url: "https://example.com",
+                    snippet: "snippet",
+                    timestamp: "2026-02-16T10:00:00.000Z",
+                  },
                 ],
               },
             },
@@ -57,20 +63,20 @@ describe("searchPerplexity", () => {
 
     const controller = new AbortController();
     const result = await searchPerplexity(
-      { query: "latest Node release notes", recency: "week", model: "pplx_pro_upgraded", incognito: true },
+      { query: "latest Node release notes", recency: "week", model: "pplx_pro_upgraded" },
       "jwt-token",
       controller.signal,
     );
 
-    expect(String(capturedUrl)).toBe("https://www.perplexity.ai/rest/sse/perplexity_ask");
-    expect(capturedInit?.method).toBe("POST");
-    expect(capturedInit?.signal).toBe(controller.signal);
+    assert.equal(String(capturedUrl), "https://www.perplexity.ai/rest/sse/perplexity_ask");
+    assert.equal(capturedInit?.method, "POST");
+    assert.equal(capturedInit?.signal, controller.signal);
 
     const headers = new Headers(capturedInit?.headers);
-    expect(headers.get("Authorization")).toBe("Bearer jwt-token");
-    expect(headers.get("Accept")).toBe("text/event-stream");
-    expect(headers.get("X-App-ApiVersion")).toBe("2.18");
-    expect(headers.get("X-Request-ID")).toBeTruthy();
+    assert.equal(headers.get("Authorization"), "Bearer jwt-token");
+    assert.equal(headers.get("Accept"), "text/event-stream");
+    assert.equal(headers.get("X-App-ApiVersion"), "2.18");
+    assert.ok(headers.get("X-Request-ID"));
 
     const body = JSON.parse(String(capturedInit?.body)) as {
       query_str: string;
@@ -85,57 +91,33 @@ describe("searchPerplexity", () => {
       };
     };
 
-    expect(body.query_str).toBe("latest Node release notes");
-    expect(body.params.query_str).toBe("latest Node release notes");
-    expect(body.params.mode).toBe("copilot");
-    expect(body.params.model_preference).toBe("pplx_pro_upgraded");
-    expect(body.params.is_incognito).toBe(true);
-    expect(body.params.search_recency_filter).toBe("week");
-    expect(body.params.frontend_uuid).toBeTruthy();
-    expect(body.params.frontend_context_uuid).toBeTruthy();
-
-    expect(result.answer).toBe("answer text");
-    expect(result.sources).toHaveLength(1);
+    assert.equal(body.query_str, "latest Node release notes");
+    assert.equal(body.params.query_str, "latest Node release notes");
+    assert.equal(body.params.mode, "copilot");
+    assert.equal(body.params.model_preference, "pplx_pro_upgraded");
+    assert.equal(body.params.is_incognito, true);
+    assert.equal(body.params.search_recency_filter, "week");
+    assert.ok(body.params.frontend_uuid);
+    assert.ok(body.params.frontend_context_uuid);
+    assert.equal(result.answer, "answer text");
+    assert.equal(result.sources.length, 1);
   });
 
-  test("passes model and incognito through to request body", async () => {
+  test("passes model through and always sends incognito true", async () => {
     let capturedInit: RequestInit | undefined;
 
     globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
       capturedInit = init;
-      return createSseResponse([
-        { status: "COMPLETED", final: true, text: "answer", blocks: [] },
-      ]);
+      return createSseResponse([{ status: "COMPLETED", final: true, text: "answer", blocks: [] }]);
     }) as unknown as typeof fetch;
 
-    await searchPerplexity(
-      { query: "q", model: "claude46sonnetthinking", incognito: false },
-      "jwt-token",
-    );
+    await searchPerplexity({ query: "q", model: "claude46sonnetthinking" }, "jwt-token");
 
     const body = JSON.parse(String(capturedInit?.body)) as {
       params: { model_preference: string; is_incognito: boolean };
     };
-    expect(body.params.model_preference).toBe("claude46sonnetthinking");
-    expect(body.params.is_incognito).toBe(false);
-  });
-
-  test("passes incognito true through to request body", async () => {
-    let capturedInit: RequestInit | undefined;
-
-    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
-      capturedInit = init;
-      return createSseResponse([
-        { status: "COMPLETED", final: true, text: "answer", blocks: [] },
-      ]);
-    }) as unknown as typeof fetch;
-
-    await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt-token");
-
-    const body = JSON.parse(String(capturedInit?.body)) as {
-      params: { is_incognito: boolean };
-    };
-    expect(body.params.is_incognito).toBe(true);
+    assert.equal(body.params.model_preference, "claude46sonnetthinking");
+    assert.equal(body.params.is_incognito, true);
   });
 
   test("cancels the response body after a terminal event", async () => {
@@ -155,30 +137,49 @@ describe("searchPerplexity", () => {
         headers: { "content-type": "text/event-stream" },
       })) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
 
-    expect(result.answer).toBe("answer");
-    expect(cancelCalled).toBe(true);
+    assert.equal(result.answer, "answer");
+    assert.equal(cancelCalled, true);
   });
 
-  test("maps 401 and 403 responses to AUTH error", async () => {
-    for (const status of [401, 403]) {
+  test("maps terminal-event cancellation failures to typed stream errors", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"status":"COMPLETED","final":true,"text":"answer"}\n\n'));
+      },
+      cancel() {
+        throw new Error("cancel failed");
+      },
+    });
+
+    globalThis.fetch = (async () =>
+      new Response(stream, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      })) as unknown as typeof fetch;
+
+    await assert.rejects(
+      searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt"),
+      (error) => error instanceof SearchError && error.code === "STREAM",
+    );
+  });
+
+  test("maps 401/403 and 429 responses to typed errors", async () => {
+    for (const status of [401, 403] as const) {
       globalThis.fetch = (async () => new Response("auth fail", { status })) as unknown as typeof fetch;
 
-      await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt")).rejects.toMatchObject({
-        name: "SearchError",
-        code: "AUTH",
-      });
+      await assert.rejects(
+        searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt"),
+        (error) => error instanceof SearchError && error.code === "AUTH",
+      );
     }
-  });
 
-  test("maps 429 responses to RATE_LIMIT error", async () => {
     globalThis.fetch = (async () => new Response("rate limited", { status: 429 })) as unknown as typeof fetch;
-
-    await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt")).rejects.toMatchObject({
-      name: "SearchError",
-      code: "RATE_LIMIT",
-    });
+    await assert.rejects(
+      searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt"),
+      (error) => error instanceof SearchError && error.code === "RATE_LIMIT",
+    );
   });
 
   test("deduplicates sources by normalized URL", async () => {
@@ -203,14 +204,14 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
 
-    expect(result.sources).toHaveLength(2);
-    expect(result.sources[0].url).toBe("https://example.com/path");
-    expect(result.sources[1].url).toBe("https://another.example/path");
+    assert.equal(result.sources.length, 2);
+    assert.equal(result.sources[0]?.url, "https://example.com/path");
+    assert.equal(result.sources[1]?.url, "https://another.example/path");
   });
 
-  test("answer extraction prioritizes markdown_block over ask_text and text", async () => {
+  test("answer extraction prioritizes markdown_block, then ask_text, then text", async () => {
     globalThis.fetch = (async () =>
       createSseResponse([
         {
@@ -225,26 +226,22 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
-    expect(result.answer).toBe("markdown answer");
-  });
+    const markdownResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
+    assert.equal(markdownResult.answer, "markdown answer");
 
-  test("answer extraction falls back to ask_text then text", async () => {
     globalThis.fetch = (async () =>
       createSseResponse([
         {
           status: "COMPLETED",
           final: true,
           text: "fallback text",
-          blocks: [
-            { intended_usage: "ask_text", markdown_block: { answer: "ask answer" } },
-          ],
+          blocks: [{ intended_usage: "ask_text", markdown_block: { answer: "ask answer" } }],
           sources_list: [{ title: "S", url: "https://example.com" }],
         },
       ])) as unknown as typeof fetch;
 
-    const askTextResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
-    expect(askTextResult.answer).toBe("ask answer");
+    const askTextResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
+    assert.equal(askTextResult.answer, "ask answer");
 
     globalThis.fetch = (async () =>
       createSseResponse([
@@ -256,22 +253,17 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const textResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
-    expect(textResult.answer).toBe("text fallback");
+    const textResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
+    assert.equal(textResult.answer, "text fallback");
   });
 
   test("returns EMPTY error when response has no answer and no sources", async () => {
     globalThis.fetch = (async () =>
       createSseResponse([{ status: "COMPLETED", final: true }])) as unknown as typeof fetch;
 
-    let thrown: unknown;
-    try {
-      await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toBeInstanceOf(SearchError);
-    expect((thrown as SearchError).code).toBe("EMPTY");
+    await assert.rejects(
+      searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt"),
+      (error) => error instanceof SearchError && error.code === "EMPTY",
+    );
   });
 });

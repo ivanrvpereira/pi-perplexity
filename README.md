@@ -41,6 +41,7 @@ The token is saved to `~/.config/pi-perplexity/auth.json` (mode `0600`) and reus
 | `PI_AUTH_NO_BORROW=1` | Skip macOS desktop app extraction and go straight to email OTP |
 | `PI_PERPLEXITY_EMAIL` | Pre-fill the email prompt (useful for non-interactive setups) |
 | `PI_PERPLEXITY_OTP` | Pre-fill the OTP prompt |
+| `PI_PERPLEXITY_MODEL` | Override the configured search model |
 
 ## Usage
 
@@ -55,7 +56,6 @@ Once installed, the agent automatically calls `perplexity_search` whenever it ne
 | `query` | string | ✅ | The search query |
 | `recency` | string | — | Filter by age: `hour` · `day` · `week` · `month` · `year` |
 | `limit` | number | — | Max sources to include (1–50) |
-| `incognito` | boolean | — | Whether to hide the search from Perplexity history; defaults to `true` |
 
 Model selection is configured globally with `/perplexity-config` or `PI_PERPLEXITY_MODEL`; it is not exposed as a tool parameter, so agent-generated tool calls cannot accidentally override your configured model.
 
@@ -82,7 +82,7 @@ Provider: perplexity (oauth)
 Model: pplx_pro_upgraded
 ```
 
-Queries default to `is_incognito: true`, but you can override that per call or via config.
+Queries always use `is_incognito: true` so the extension does not write to your Perplexity history.
 
 ## How It Works
 

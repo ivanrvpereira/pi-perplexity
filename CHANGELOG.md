@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Removed the Bun runtime dependency; Perplexity requests now use pi's Node runtime and development uses npm scripts.
+- Simplified privacy handling: searches now always run with `is_incognito: true`; the tool parameter, config setting, and TUI display were removed.
+- Auth failures now tell users to run `/perplexity-login --force` instead of clearing cached credentials as a hidden side effect.
+- Replaced the custom Jest-style test assertion layer with Node's built-in `assert` APIs.
 
 ### Fixed
 
