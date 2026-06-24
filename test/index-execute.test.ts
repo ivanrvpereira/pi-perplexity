@@ -7,6 +7,7 @@ afterEach(() => {
 describe("perplexity_search execute", () => {
   test("includes effective config values in the search request and result details", async () => {
     const authenticate = mock(async () => "jwt-token");
+    const saveBrowserAuthInput = mock(async () => ({ type: "oauth", access: "jwt-token" }));
     const loadConfig = mock(async () => ({ model: "gpt54", incognito: false }));
     const resolveSearchDefaults = mock(() => ({ model: "gpt54", incognito: false }));
     const searchPerplexity = mock(async () => ({
@@ -16,7 +17,7 @@ describe("perplexity_search execute", () => {
       uuid: "req-123",
     }));
 
-    mock.module("../src/auth/login.js", () => ({ authenticate }));
+    mock.module("../src/auth/login.js", () => ({ authenticate, saveBrowserAuthInput }));
     mock.module("../src/config.js", () => ({
       getConfigPath: () => "/tmp/pi-perplexity-config.json",
       loadConfig,

@@ -53,7 +53,7 @@ describe("Perplexity model selection e2e", () => {
             incognito: true,
             limit: 1,
           },
-          token.access,
+          token,
         );
 
         expect(result.answer.trim().startsWith("OK")).toBe(true);

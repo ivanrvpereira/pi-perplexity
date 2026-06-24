@@ -1,5 +1,5 @@
 import { mergeEvent, readSseEvents } from "./stream.js";
-import type { SearchResult, StreamEvent, WebResult } from "./types.js";
+import type { SearchResult, StoredToken, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
 import { errorMessage } from "../render/util.js";
 import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
@@ -132,9 +132,12 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
   };
 }
 
-function buildRequestHeaders(jwt: string, requestId: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${jwt}`,
+type AuthCredentials = string | StoredToken;
+
+function buildRequestHeaders(auth: AuthCredentials, requestId: string): Record<string, string> {
+  const access = typeof auth === "string" ? auth : auth.access;
+  const cookies = typeof auth === "string" ? undefined : auth.cookies;
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "text/event-stream",
     Origin: "https://www.perplexity.ai",
@@ -145,13 +148,21 @@ function buildRequestHeaders(jwt: string, requestId: string): Record<string, str
     "X-Perplexity-Request-Reason": "submit",
     "X-Request-ID": requestId,
   };
+
+  if (cookies) {
+    headers.Cookie = cookies;
+  } else if (access) {
+    headers.Authorization = `Bearer ${access}`;
+  }
+
+  return headers;
 }
 
 function mapHttpError(status: number): SearchError {
   if (status === 401 || status === 403) {
     return new SearchError(
       "AUTH",
-      "Perplexity rejected authentication (401/403). Sign in to Perplexity desktop app and retry.",
+      "Perplexity rejected authentication (401/403). Re-run /perplexity-login --force, or use /perplexity-login --browser if direct OTP is blocked.",
     );
   }
 
@@ -171,12 +182,12 @@ function mapHttpError(status: number): SearchError {
 /** Execute a Perplexity search: POST SSE, stream/merge events, extract answer + sources. Throws SearchError on failure. */
 export async function searchPerplexity(
   params: SearchParams,
-  jwt: string,
+  auth: AuthCredentials,
   signal?: AbortSignal,
 ): Promise<SearchResult> {
   const requestId = crypto.randomUUID();
   const requestBody = buildRequestBody(params);
-  const requestHeaders = buildRequestHeaders(jwt, requestId);
+  const requestHeaders = buildRequestHeaders(auth, requestId);
 
   let response: Response;
   try {

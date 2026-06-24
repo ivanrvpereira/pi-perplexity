@@ -10,6 +10,8 @@ const originalFetch = globalThis.fetch;
 const originalBorrow = process.env.PI_AUTH_NO_BORROW;
 const originalEmail = process.env.PI_PERPLEXITY_EMAIL;
 const originalOtp = process.env.PI_PERPLEXITY_OTP;
+const originalToken = process.env.PI_PERPLEXITY_TOKEN;
+const originalCookie = process.env.PI_PERPLEXITY_COOKIE;
 
 // --- Fixtures from real Perplexity responses (scripts/debug-login-dump.json) ---
 
@@ -45,6 +47,8 @@ function restoreEnv(): void {
     ["PI_AUTH_NO_BORROW", originalBorrow],
     ["PI_PERPLEXITY_EMAIL", originalEmail],
     ["PI_PERPLEXITY_OTP", originalOtp],
+    ["PI_PERPLEXITY_TOKEN", originalToken],
+    ["PI_PERPLEXITY_COOKIE", originalCookie],
   ] as const) {
     if (original === undefined) {
       delete process.env[key];
@@ -131,7 +135,7 @@ describe("OTP login flow (from real captured responses)", () => {
       promptForOtp: async () => TEST_OTP,
     });
 
-    expect(token).toBe(REAL_JWE_TOKEN);
+    expect(token.access).toBe(REAL_JWE_TOKEN);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(saveTokenMock).toHaveBeenCalledTimes(1);
 
@@ -212,7 +216,7 @@ describe("OTP login flow (from real captured responses)", () => {
 
     const token = await authenticate({ promptForEmail, promptForOtp });
 
-    expect(token).toBe(REAL_JWE_TOKEN);
+    expect(token.access).toBe(REAL_JWE_TOKEN);
     expect(promptForEmail).toHaveBeenCalledTimes(0);
     expect(promptForOtp).toHaveBeenCalledTimes(0);
   });
