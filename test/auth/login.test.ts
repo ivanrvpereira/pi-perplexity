@@ -366,6 +366,19 @@ describe("auth/login", () => {
     expect(parsed?.access).toBe(browserToken);
   });
 
+  test("parseBrowserAuthInput extracts cookies from unquoted -b and --cookie cURL forms", async () => {
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    const { parseBrowserAuthInput } = await importLoginModule();
+
+    for (const flag of ["-b", "--cookie"]) {
+      const curl = `curl 'https://www.perplexity.ai/rest/sse/perplexity_ask' ${flag} __Secure-next-auth.session-token=${browserToken}`;
+      const parsed = parseBrowserAuthInput(curl);
+
+      expect(parsed?.cookies).toBe(`__Secure-next-auth.session-token=${browserToken}`);
+      expect(parsed?.access).toBe(browserToken);
+    }
+  });
+
   test("saveBrowserAuthInput explains Copy as cURL without cookies", async () => {
     const curl = `curl 'https://www.perplexity.ai/' \\
   -H 'Upgrade-Insecure-Requests: 1' \\

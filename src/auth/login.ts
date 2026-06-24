@@ -100,7 +100,7 @@ function extractCookieHeader(input: string): string {
     return quotedCurlCookieOption.trim();
   }
 
-  const unquotedCurlCookieOption = trimmed.match(/(?:^|\s)(?:-b|--cookie)=([^\s\\]+)/i)?.[1];
+  const unquotedCurlCookieOption = trimmed.match(/(?:^|\s)(?:-b|--cookie)(?:=|\s+)([^\s\\]+)/i)?.[1];
   if (unquotedCurlCookieOption) {
     return unquotedCurlCookieOption.trim();
   }

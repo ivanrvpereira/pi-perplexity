@@ -23,7 +23,7 @@ pi install github:ivanrvpereira/pi-perplexity
 
 Run login once:
 
-```
+```text
 /perplexity-login
 ```
 
@@ -31,7 +31,7 @@ This usually reuses an existing cached login, borrows the Perplexity macOS app l
 
 If login fails with a Cloudflare “Just a moment...” page, use browser login instead:
 
-```
+```text
 /perplexity-login --browser
 ```
 
