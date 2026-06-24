@@ -12,10 +12,11 @@ function isStoredToken(value: unknown): value is StoredToken {
   }
 
   const candidate = value as Record<string, unknown>;
+  const hasAccess = typeof candidate.access === "string" && candidate.access.length > 0;
+  const hasCookies = typeof candidate.cookies === "string" && candidate.cookies.length > 0;
   return (
     candidate.type === "oauth" &&
-    typeof candidate.access === "string" &&
-    candidate.access.length > 0
+    (hasAccess || hasCookies)
   );
 }
 

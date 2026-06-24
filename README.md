@@ -5,7 +5,7 @@ A [pi](https://github.com/badlogic/pi-mono) extension that gives your coding age
 
 - [pi](https://github.com/badlogic/pi-mono) coding agent with its bundled Node runtime (Node 18.14.1+ if running outside pi)
 - A **Perplexity Pro** or **Max** subscription
-- macOS (for zero-interaction auth) _or_ an interactive terminal (for email OTP)
+- macOS (for zero-interaction auth), an interactive terminal (for email OTP), or a signed-in browser session cookie/token
 
 ## Installation
 
@@ -21,16 +21,34 @@ pi install github:ivanrvpereira/pi-perplexity
 
 ## Authentication
 
-Run the login command once to cache your token:
+Run login once:
 
 ```
 /perplexity-login
 ```
 
-The extension tries two methods in order:
+This usually reuses an existing cached login, borrows the Perplexity macOS app login if available, or asks for your email OTP code.
 
-1. **macOS Desktop App** _(zero interaction)_ — borrows the JWT directly from the Perplexity macOS app if it's installed and signed in. Nothing to type.
-2. **Email OTP** _(interactive fallback)_ — prompts for your Perplexity email, sends a one-time code, and prompts for the code.
+If login fails with a Cloudflare “Just a moment...” page, use browser login instead:
+
+```
+/perplexity-login --browser
+```
+
+### Browser login
+
+Use this on Linux/headless machines when direct OTP is blocked.
+
+1. Open `https://www.perplexity.ai` and sign in.
+2. Open browser DevTools → **Network**.
+3. Reload the page, or ask one Perplexity question.
+4. Right-click a `www.perplexity.ai` request, preferably `perplexity_ask`.
+5. Choose **Copy** → **Copy as cURL**.
+6. Paste the copied cURL command into the pi prompt.
+
+The copied text must include cookies. A good copy contains one of `-b`, `--cookie`, or `Cookie:`, and should include `__Secure-next-auth.session-token`. If it does not, copy a different request.
+
+You can also paste just the request `Cookie:` header, or just the `__Secure-next-auth.session-token` cookie value. Full cURL is recommended because it also includes Cloudflare cookies like `cf_clearance`.
 
 The token is saved to `~/.config/pi-perplexity/auth.json` (mode `0600`) and reused across sessions. On auth failure, run `/perplexity-login --force` to clear and re-authenticate.
 
@@ -39,6 +57,8 @@ The token is saved to `~/.config/pi-perplexity/auth.json` (mode `0600`) and reus
 | Variable | Description |
 |---|---|
 | `PI_AUTH_NO_BORROW=1` | Skip macOS desktop app extraction and go straight to email OTP |
+| `PI_PERPLEXITY_TOKEN` | Raw Perplexity session token/JWT/JWE copied from a browser or another machine |
+| `PI_PERPLEXITY_COOKIE` / `PI_PERPLEXITY_COOKIES` | Full Perplexity `Cookie` header copied from a signed-in browser |
 | `PI_PERPLEXITY_EMAIL` | Pre-fill the email prompt (useful for non-interactive setups) |
 | `PI_PERPLEXITY_OTP` | Pre-fill the OTP prompt |
 
@@ -86,7 +106,7 @@ Queries default to `is_incognito: true`, but you can override that per call or v
 
 ## How It Works
 
-The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app or via email OTP. Responses stream as incremental events that are merged into a final result. Network calls use the Node runtime already provided by pi; no extra runtime is required. Email OTP auth requires `Headers.getSetCookie()` support so auth cookies are exposed reliably.
+The extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app, email OTP, or a browser-imported session. Responses stream as incremental events that are merged into a final result. Network calls use the Node runtime already provided by pi; no extra runtime is required. Email OTP auth requires `Headers.getSetCookie()` support so auth cookies are exposed reliably.
 
 ## Development
 

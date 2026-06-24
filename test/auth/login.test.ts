@@ -6,6 +6,8 @@ const originalFetch = globalThis.fetch;
 const originalBorrow = process.env.PI_AUTH_NO_BORROW;
 const originalEmail = process.env.PI_PERPLEXITY_EMAIL;
 const originalOtp = process.env.PI_PERPLEXITY_OTP;
+const originalToken = process.env.PI_PERPLEXITY_TOKEN;
+const originalCookie = process.env.PI_PERPLEXITY_COOKIE;
 
 function createJwt(expiryMs: number): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -45,6 +47,18 @@ function restoreEnv(): void {
     delete process.env.PI_PERPLEXITY_OTP;
   } else {
     process.env.PI_PERPLEXITY_OTP = originalOtp;
+  }
+
+  if (originalToken === undefined) {
+    delete process.env.PI_PERPLEXITY_TOKEN;
+  } else {
+    process.env.PI_PERPLEXITY_TOKEN = originalToken;
+  }
+
+  if (originalCookie === undefined) {
+    delete process.env.PI_PERPLEXITY_COOKIE;
+  } else {
+    process.env.PI_PERPLEXITY_COOKIE = originalCookie;
   }
 }
 
@@ -158,7 +172,7 @@ describe("auth/login", () => {
 
     const token = await authenticate();
 
-    expect(token).toBe(cachedToken);
+    expect(token.access).toBe(cachedToken);
     expect(loadTokenMock).toHaveBeenCalledTimes(1);
     expect(saveTokenMock).toHaveBeenCalledTimes(0);
     expect(clearTokenMock).toHaveBeenCalledTimes(0);
@@ -216,7 +230,7 @@ describe("auth/login", () => {
       promptForOtp: async () => "123456",
     });
 
-    expect(token).toBe(otpToken);
+    expect(token.access).toBe(otpToken);
     expect(loadTokenMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(saveTokenMock).toHaveBeenCalledTimes(1);
@@ -241,6 +255,208 @@ describe("auth/login", () => {
     });
 
     expect(clearTokenMock).toHaveBeenCalledTimes(0);
+  });
+
+  test("authenticate saves PI_PERPLEXITY_TOKEN without desktop or OTP calls", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+    process.env.PI_PERPLEXITY_TOKEN = "env-token";
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate();
+
+    expect(token.access).toBe("env-token");
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
+    expect(saveTokenMock.mock.calls[0]?.[0]).toEqual({ type: "oauth", access: "env-token" });
+  });
+
+  test("authenticate saves browser Cookie header from PI_PERPLEXITY_COOKIE", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    process.env.PI_PERPLEXITY_COOKIE =
+      `pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance`;
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate();
+
+    expect(token.cookies).toContain("__Secure-next-auth.session-token=");
+    expect(token.access).toBe(browserToken);
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("authenticate rejects PI_PERPLEXITY_COOKIE without a signed-in session cookie", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+    process.env.PI_PERPLEXITY_COOKIE = "pplx.visitor-id=visitor; cf_clearance=clearance";
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const { authenticate } = await importLoginModule();
+
+    let thrown: unknown;
+    try {
+      await authenticate();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AuthError);
+    expect((thrown as AuthError).code).toBe("NO_TOKEN");
+    expect((thrown as Error).message).toContain("PI_PERPLEXITY_COOKIE is set");
+    expect((thrown as Error).message).toContain("not a Perplexity signed-in session cookie");
+    expect(saveTokenMock).toHaveBeenCalledTimes(0);
+  });
+
+  test("parseBrowserAuthInput extracts cookies from Copy as cURL", async () => {
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    const curl = `curl 'https://www.perplexity.ai/rest/sse/perplexity_ask' \\
+  -H 'accept: text/event-stream' \\
+  -H 'cookie: pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance' \\
+  --data-raw '{"query":"hello"}'`;
+
+    const { parseBrowserAuthInput } = await importLoginModule();
+    const parsed = parseBrowserAuthInput(curl);
+
+    expect(parsed?.cookies).toBe(
+      `pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance`,
+    );
+    expect(parsed?.access).toBe(browserToken);
+  });
+
+  test("parseBrowserAuthInput extracts cookies from --cookie= cURL form", async () => {
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    const curl = `curl 'https://www.perplexity.ai/rest/sse/perplexity_ask' \\
+  --cookie='pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance' \\
+  --data-raw '{"query":"hello"}'`;
+
+    const { parseBrowserAuthInput } = await importLoginModule();
+    const parsed = parseBrowserAuthInput(curl);
+
+    expect(parsed?.cookies).toBe(
+      `pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance`,
+    );
+    expect(parsed?.access).toBe(browserToken);
+  });
+
+  test("saveBrowserAuthInput explains Copy as cURL without cookies", async () => {
+    const curl = `curl 'https://www.perplexity.ai/' \\
+  -H 'Upgrade-Insecure-Requests: 1' \\
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36' \\
+  -H 'sec-ch-ua: "Chromium";v="149", "Not)A;Brand";v="24"' \\
+  -H 'sec-ch-ua-mobile: ?0' \\
+  -H 'sec-ch-ua-platform: "macOS"'`;
+
+    const { saveBrowserAuthInput } = await importLoginModule();
+
+    let thrown: unknown;
+    try {
+      await saveBrowserAuthInput(curl);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AuthError);
+    expect((thrown as AuthError).code).toBe("NO_TOKEN");
+    expect((thrown as Error).message).toContain("The cURL command you pasted does not include cookies");
+    expect((thrown as Error).message).toContain("-b");
+    expect((thrown as Error).message).toContain("__Secure-next-auth.session-token");
+  });
+
+  test("authenticate reproduces Cloudflare CSRF failure without browser fallback", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const fetchMock = mock(async () =>
+      new Response("<!DOCTYPE html><html><head><title>Just a moment...</title></head></html>", {
+        status: 403,
+      }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { authenticate } = await importLoginModule();
+
+    let thrown: unknown;
+    try {
+      await authenticate({
+        promptForEmail: async () => "user@example.com",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AuthError);
+    expect((thrown as AuthError).code).toBe("EXTRACTION_FAILED");
+    expect((thrown as Error).message).toContain("Failed to fetch CSRF token");
+    expect((thrown as Error).message).toContain("browser challenge");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(saveTokenMock).toHaveBeenCalledTimes(0);
+  });
+
+  test("authenticate falls back to browser auth when OTP CSRF hits Cloudflare", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const fetchMock = mock(async () =>
+      new Response("<!DOCTYPE html><title>Just a moment...</title>", { status: 403 }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate({
+      promptForEmail: async () => "user@example.com",
+      promptForBrowserAuth: async () => `__Secure-next-auth.session-token=${browserToken}; cf_clearance=ok`,
+    });
+
+    expect(token.cookies).toContain("cf_clearance=ok");
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
   });
   test("authenticate throws NO_TOKEN when no cached token and no OTP email input", async () => {
     process.env.PI_AUTH_NO_BORROW = "1";

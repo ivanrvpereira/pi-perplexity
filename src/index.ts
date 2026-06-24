@@ -54,10 +54,31 @@ export default function (pi: ExtensionAPI) {
           return ctx.ui.input(label, placeholder);
         };
 
-        const jwt = await authenticate({
+        const auth = await authenticate({
           ...(signal !== undefined ? { signal } : {}),
           promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
           promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
+          promptForBrowserAuth: async () => {
+            ctx?.ui?.notify?.(
+              [
+                "Browser login needed:",
+                "1. Open https://www.perplexity.ai and sign in.",
+                "2. Open DevTools → Network.",
+                "3. Reload the page or ask one Perplexity question.",
+                "4. Right-click a www.perplexity.ai request → Copy → Copy as cURL.",
+                "5. Paste the copied cURL command here.",
+                "",
+                "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-next-auth.session-token.",
+                "If it does not, copy a different www.perplexity.ai request, preferably perplexity_ask.",
+                "Alternatives: paste the request Cookie header, or paste the __Secure-next-auth.session-token value.",
+              ].join("\n"),
+              "info",
+            );
+            return promptInput(
+              "Paste copied cURL command or Cookie header",
+              "curl 'https://www.perplexity.ai/' -H 'Cookie: ...'",
+            );
+          },
         });
 
         if (signal?.aborted) {
@@ -88,7 +109,7 @@ export default function (pi: ExtensionAPI) {
             ...(params.recency !== undefined ? { recency: params.recency } : {}),
             ...(params.limit !== undefined ? { limit: params.limit } : {}),
           },
-          jwt,
+          auth,
           signal,
         );
 

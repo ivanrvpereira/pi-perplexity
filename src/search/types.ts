@@ -42,7 +42,8 @@ export interface StreamSource {
 
 export interface StoredToken {
   type: "oauth";
-  access: string;
+  access?: string;
+  cookies?: string;
   email?: string;
 }
 

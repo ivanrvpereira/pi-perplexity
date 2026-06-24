@@ -120,6 +120,26 @@ describe("searchPerplexity", () => {
     expect(body.params.is_incognito).toBe(false);
   });
 
+  test("uses Cookie header for browser-cookie credentials", async () => {
+    let capturedInit: RequestInit | undefined;
+
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      capturedInit = init;
+      return createSseResponse([
+        { status: "COMPLETED", final: true, text: "answer", blocks: [] },
+      ]);
+    }) as unknown as typeof fetch;
+
+    await searchPerplexity(
+      { query: "q", model: "pplx_pro_upgraded", incognito: true },
+      { type: "oauth", cookies: "__Secure-next-auth.session-token=session; cf_clearance=clearance" },
+    );
+
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get("Cookie")).toBe("__Secure-next-auth.session-token=session; cf_clearance=clearance");
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
   test("passes incognito true through to request body", async () => {
     let capturedInit: RequestInit | undefined;
 
