@@ -1,6 +1,6 @@
 {
   "name": "pi-perplexity",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Perplexity web search for pi — uses your Pro/Max subscription, no API credits needed",
   "keywords": [
     "pi-package",
