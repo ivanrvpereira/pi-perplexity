@@ -58,7 +58,7 @@ function credentialsFromEnvironment(): StoredToken | null {
     const value = normalizeInput(process.env[key]);
     if (value) {
       const credentials = parseBrowserAuthInput(value);
-      if (!credentials?.cookies) {
+      if (!credentials) {
         throw new AuthError(
           "NO_TOKEN",
           `${key} is set but does not contain a signed-in Perplexity browser cookie. ${browserAuthFailureMessage(value)}`,

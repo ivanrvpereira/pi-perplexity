@@ -314,6 +314,30 @@ describe("auth/login", () => {
     expect(saveTokenMock).toHaveBeenCalledTimes(1);
   });
 
+  test("authenticate accepts a bare session token from PI_PERPLEXITY_COOKIE", async () => {
+    process.env.PI_AUTH_NO_BORROW = "1";
+    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
+    process.env.PI_PERPLEXITY_COOKIE = browserToken;
+
+    const loadTokenMock = mock(async () => null);
+    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
+    const clearTokenMock = mock(async () => undefined);
+
+    mock.module("../../src/auth/storage.js", () => ({
+      loadToken: loadTokenMock,
+      saveToken: saveTokenMock,
+      clearToken: clearTokenMock,
+    }));
+
+    const { authenticate } = await importLoginModule();
+
+    const token = await authenticate();
+
+    expect(token.access).toBe(browserToken);
+    expect(token.cookies).toBe(undefined);
+    expect(saveTokenMock).toHaveBeenCalledTimes(1);
+  });
+
   test("authenticate rejects PI_PERPLEXITY_COOKIE without a signed-in session cookie", async () => {
     process.env.PI_AUTH_NO_BORROW = "1";
     process.env.PI_PERPLEXITY_COOKIE = "pplx.visitor-id=visitor; cf_clearance=clearance";
