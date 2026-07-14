@@ -57,7 +57,7 @@ node --import @mariozechner/jiti/register --input-type=module -e "import('./src/
 - Auth tries macOS app token first via `defaults read ai.perplexity.mac authToken`, unless `PI_AUTH_NO_BORROW=1`.
 - Email OTP fallback uses `ctx.ui.input()`.
 - Tokens are stored at `~/.config/pi-perplexity/auth.json` with mode `0600`.
-- JWT expiry is `decoded.exp * 1000` with a 5 minute buffer; decode failures fall back to 1 hour.
+- Stored tokens have no expiry tracking; `loadToken()` returns any cached token and expiry surfaces as 401/403 at request time.
 - AUTH errors preserve the cached token; users explicitly clear/re-auth with `/perplexity-login --force`.
 
 ## Boundaries
