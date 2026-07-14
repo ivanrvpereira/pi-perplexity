@@ -1,6 +1,6 @@
 {
   "name": "pi-perplexity",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Perplexity web search for pi — uses your Pro/Max subscription, no API credits needed",
   "keywords": [
     "pi-package",
@@ -25,15 +25,13 @@
     ]
   },
   "peerDependencies": {
-    "@mariozechner/pi-tui": "*",
-    "@mariozechner/pi-ai": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": "*"
   },
   "devDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*",
-    "@mariozechner/pi-ai": "*",
-    "@sinclair/typebox": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": "*",
     "@types/node": "*",
     "typescript": "*"
   },

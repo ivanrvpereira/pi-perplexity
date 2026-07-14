@@ -58,14 +58,16 @@ function formatSource(source: WebResult, index: number): string {
   return lines.join("\n");
 }
 
+/** Number of sources actually rendered for a given total and requested limit. */
+export function effectiveSourceCount(total: number, limit?: number): number {
+  const sourceLimit =
+    typeof limit === "number" && Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : total;
+  return Math.min(sourceLimit, total);
+}
+
 /** Format a SearchResult into LLM-friendly text with ## Answer, ## Sources, ## Meta sections. */
 export function formatForLLM(result: SearchResult, limit?: number): string {
-  const sourceLimit =
-    typeof limit === "number" && Number.isFinite(limit)
-      ? Math.max(0, Math.floor(limit))
-      : result.sources.length;
-
-  const limitedSources = result.sources.slice(0, sourceLimit);
+  const limitedSources = result.sources.slice(0, effectiveSourceCount(result.sources.length, limit));
 
   const sourceSection =
     limitedSources.length === 0

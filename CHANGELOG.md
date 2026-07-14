@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### CI
+
+- Restrict npm publishing to tags whose commit is already on `main`.
+
+## [0.2.5] - 2026-07-14
+
+### Changed
+
+- Browser credential paste now runs exclusively through `/perplexity-login --browser`; `authenticate()` no longer prompts inline on Cloudflare challenges.
+- URL deduplication of sources now lowercases only the scheme and host, keeping case-sensitive paths and queries distinct.
+
+### Fixed
+
+- Stop clearing the cached auth token automatically when Perplexity rejects authentication (transient 401/403); use `/perplexity-login --force` to re-auth explicitly.
+- Import `randomUUID` from `node:crypto` instead of relying on the global WebCrypto object, restoring the documented Node 18.14.1 support.
+- Report `sourceCount` consistently with the rendered source list when `limit` is fractional or out of range.
+
+### CI
+
+- Run typecheck and tests on push/PR and before npm publish.
+
+## [0.2.4] - 2026-06-24
+
+### Added
+
+- Browser cookie login fallback: paste a Copy-as-cURL command or Cookie header via `/perplexity-login` when desktop/OTP auth is unavailable.
+
+## [0.2.3] - 2026-06-24
+
 ### Changed
 
 - Removed the Bun runtime dependency; Perplexity requests now use pi's Node runtime and development uses npm scripts.

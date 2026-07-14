@@ -1,18 +1,16 @@
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { StringEnum, Type } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { registerPerplexityConfigCommand } from "./commands/config.js";
 import { registerPerplexityCommands } from "./commands/login.js";
 
 import { authenticate } from "./auth/login.js";
-import { clearToken } from "./auth/storage.js";
 import { loadConfig, resolveSearchDefaults } from "./config.js";
-import { formatForLLM } from "./search/format.js";
+import { effectiveSourceCount, formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
 import { renderPerplexityResult } from "./render/result.js";
-import { errorMessage } from "./render/util.js";
+import { errorMessage } from "./util.js";
 import { AuthError, SearchError } from "./search/types.js";
 
 export default function (pi: ExtensionAPI) {
@@ -58,27 +56,6 @@ export default function (pi: ExtensionAPI) {
           ...(signal !== undefined ? { signal } : {}),
           promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
           promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
-          promptForBrowserAuth: async () => {
-            ctx?.ui?.notify?.(
-              [
-                "Browser login needed:",
-                "1. Open https://www.perplexity.ai and sign in.",
-                "2. Open DevTools → Network.",
-                "3. Reload the page or ask one Perplexity question.",
-                "4. Right-click a www.perplexity.ai request → Copy → Copy as cURL.",
-                "5. Paste the copied cURL command here.",
-                "",
-                "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-next-auth.session-token.",
-                "If it does not, copy a different www.perplexity.ai request, preferably perplexity_ask.",
-                "Alternatives: paste the request Cookie header, or paste the __Secure-next-auth.session-token value.",
-              ].join("\n"),
-              "info",
-            );
-            return promptInput(
-              "Paste copied cURL command or Cookie header",
-              "curl 'https://www.perplexity.ai/' -H 'Cookie: ...'",
-            );
-          },
         });
 
         if (signal?.aborted) {
@@ -95,9 +72,7 @@ export default function (pi: ExtensionAPI) {
 
         const config = await loadConfig();
         const { model, incognito } = resolveSearchDefaults(
-          {
-            ...(params.incognito !== undefined ? { incognito: params.incognito } : {}),
-          },
+          params.incognito !== undefined ? { incognito: params.incognito } : {},
           config,
         );
 
@@ -107,17 +82,13 @@ export default function (pi: ExtensionAPI) {
             model,
             incognito,
             ...(params.recency !== undefined ? { recency: params.recency } : {}),
-            ...(params.limit !== undefined ? { limit: params.limit } : {}),
           },
           auth,
           signal,
         );
 
         const formatted = formatForLLM(result, params.limit);
-        sourceCount =
-          typeof params.limit === "number"
-            ? Math.min(params.limit, result.sources.length)
-            : result.sources.length;
+        sourceCount = effectiveSourceCount(result.sources.length, params.limit);
 
         return {
           content: [{ type: "text", text: formatted }],
@@ -140,10 +111,6 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (error instanceof SearchError) {
-          if (error.code === "AUTH") {
-            // Clear cached token on auth rejection so next call triggers re-login.
-            await clearToken().catch(() => undefined);
-          }
           return {
             content: [{ type: "text", text: `Perplexity search failed: ${error.message}` }],
             details: { sourceCount, queryMs, isError: true },

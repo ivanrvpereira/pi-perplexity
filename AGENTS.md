@@ -2,16 +2,16 @@
 
 ## Stack
 
-- TypeScript extension for `@mariozechner/pi-coding-agent`; loaded directly via jiti, no build artifact.
+- TypeScript extension for `@earendil-works/pi-coding-agent`; loaded directly via jiti, no build artifact.
 - Node >=18.14.1 runtime APIs only: `fetch`, `crypto.randomUUID()`, `Buffer.from(..., "base64url")`, `Intl`.
-- Pi-bundled packages live in `peerDependencies` with `"*"`: `@mariozechner/pi-tui`, `@mariozechner/pi-ai`, `@sinclair/typebox`.
+- Pi-bundled packages live in `peerDependencies` with `"*"`: `@earendil-works/pi-tui`, `@earendil-works/pi-ai`. `Type` is re-exported by `@earendil-works/pi-ai`; do not depend on `typebox` directly.
 
 ## Commands
 
 ```bash
 npm run typecheck
 npm test
-node --import @mariozechner/jiti/register --input-type=module -e "import('./src/index.ts').then((m)=>{ const entry = m.default?.default ?? m.default; if (typeof entry !== 'function') throw new Error('default export missing'); })"
+node --no-deprecation --import ./node_modules/@earendil-works/pi-coding-agent/node_modules/jiti/lib/jiti-register.mjs --input-type=module -e "import('./src/index.ts').then((m)=>{ const entry = m.default?.default ?? m.default; if (typeof entry !== 'function') throw new Error('default export missing'); })"
 ```
 
 ## File-Scoped Commands
@@ -38,7 +38,7 @@ node --import @mariozechner/jiti/register --input-type=module -e "import('./src/
 - Tool name is `perplexity_search`.
 - Tool `execute` signature is `(toolCallId, params, signal, onUpdate, ctx)`.
 - Tool results use `{ content: [{ type: "text", text }], details: { ... } }`.
-- String enum params use `StringEnum` from `@mariozechner/pi-ai`; `Type.Union([Type.Literal(...)])` breaks Google models.
+- String enum params use `StringEnum` from `@earendil-works/pi-ai`; `Type.Union([Type.Literal(...)])` breaks Google models.
 - Stream/API types stay loose: all reverse-engineered event fields are optional.
 
 ## Perplexity Protocol Gotchas
@@ -57,7 +57,7 @@ node --import @mariozechner/jiti/register --input-type=module -e "import('./src/
 - Auth tries macOS app token first via `defaults read ai.perplexity.mac authToken`, unless `PI_AUTH_NO_BORROW=1`.
 - Email OTP fallback uses `ctx.ui.input()`.
 - Tokens are stored at `~/.config/pi-perplexity/auth.json` with mode `0600`.
-- JWT expiry is `decoded.exp * 1000` with a 5 minute buffer; decode failures fall back to 1 hour.
+- Stored tokens have no expiry tracking; `loadToken()` returns any cached token and expiry surfaces as 401/403 at request time.
 - AUTH errors preserve the cached token; users explicitly clear/re-auth with `/perplexity-login --force`.
 
 ## Boundaries

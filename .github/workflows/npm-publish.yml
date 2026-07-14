@@ -14,10 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on main; refusing to publish."
+            exit 1
+          }
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
@@ -26,10 +36,13 @@ jobs:
         run: node -e "const {version}=require('./package.json'); const tag=process.env.GITHUB_REF_NAME.replace(/^v/,''); if(version!==tag){console.error(\`Tag \${tag} does not match package.json version \${version}\`); process.exit(1);}"
 
       - name: Upgrade npm
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify
+        run: npm run typecheck && npm test
 
       - name: Publish
         run: npm publish --provenance --access public

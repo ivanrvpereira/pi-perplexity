@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import { mergeEvent, readSseEvents } from "./stream.js";
 import type { SearchResult, StoredToken, StreamEvent, WebResult } from "./types.js";
 import { SearchError } from "./types.js";
-import { errorMessage } from "../render/util.js";
+import { errorMessage } from "../util.js";
 import { PERPLEXITY_USER_AGENT, PERPLEXITY_API_VERSION } from "../constants.js";
 
 const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
@@ -9,13 +11,18 @@ const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
 export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
-  limit?: number;
   model: string;
   incognito: boolean;
 }
 
 function normalizeUrl(url: string): string {
-  return url.trim().replace(/\/$/, "").toLowerCase();
+  const trimmed = url.trim().replace(/\/$/, "");
+  try {
+    // URL lowercases scheme and host; paths/queries stay case-sensitive.
+    return new URL(trimmed).href.replace(/\/$/, "");
+  } catch {
+    return trimmed.toLowerCase();
+  }
 }
 
 function dedupeSourcesByUrl(sources: WebResult[]): WebResult[] {
@@ -119,8 +126,8 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
       model_preference: params.model,
       sources: ["web"],
       attachments: [],
-      frontend_uuid: crypto.randomUUID(),
-      frontend_context_uuid: crypto.randomUUID(),
+      frontend_uuid: randomUUID(),
+      frontend_context_uuid: randomUUID(),
       version: PERPLEXITY_API_VERSION,
       language: "en-US",
       timezone,
@@ -185,7 +192,7 @@ export async function searchPerplexity(
   auth: AuthCredentials,
   signal?: AbortSignal,
 ): Promise<SearchResult> {
-  const requestId = crypto.randomUUID();
+  const requestId = randomUUID();
   const requestBody = buildRequestBody(params);
   const requestHeaders = buildRequestHeaders(auth, requestId);
 
