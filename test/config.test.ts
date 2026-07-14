@@ -5,10 +5,9 @@ import { join } from "node:path";
 
 let loadConfig: (configPath?: string) => Promise<import("../src/config.js").PerplexityConfig>;
 let saveConfig: (config: import("../src/config.js").PerplexityConfig, configPath?: string) => Promise<void>;
-let resolveSearchDefaults: (
-  params: { incognito?: boolean },
+let resolveDefaultModel: (
   config: import("../src/config.js").PerplexityConfig,
-) => { model: string; incognito: boolean };
+) => string;
 
 let tempDir: string;
 let configPath: string;
@@ -20,7 +19,7 @@ beforeEach(async () => {
   const mod = await import(`../src/config.js?t=${Date.now()}`);
   loadConfig = mod.loadConfig;
   saveConfig = mod.saveConfig;
-  resolveSearchDefaults = mod.resolveSearchDefaults;
+  resolveDefaultModel = mod.resolveDefaultModel;
 });
 
 afterEach(async () => {
@@ -34,10 +33,9 @@ describe("loadConfig", () => {
   });
 
   test("returns parsed config from file", async () => {
-    await writeFile(configPath, JSON.stringify({ model: "gpt54", incognito: false }));
+    await writeFile(configPath, JSON.stringify({ model: "gpt54" }));
     const config = await loadConfig(configPath);
     expect(config.model).toBe("gpt54");
-    expect(config.incognito).toBe(false);
   });
 
   test("throws on invalid JSON", async () => {
@@ -51,10 +49,11 @@ describe("loadConfig", () => {
   });
 
   test("ignores unknown fields", async () => {
-    await writeFile(configPath, JSON.stringify({ model: "gpt54", unknown: true }));
+    await writeFile(configPath, JSON.stringify({ model: "gpt54", unknown: true, incognito: false }));
     const config = await loadConfig(configPath);
     expect(config.model).toBe("gpt54");
     expect(config).not.toHaveProperty("unknown");
+    expect(config).not.toHaveProperty("incognito");
   });
 
   test("ignores empty model string", async () => {
@@ -66,12 +65,11 @@ describe("loadConfig", () => {
 
 describe("saveConfig", () => {
   test("writes file with 0600 permissions", async () => {
-    await saveConfig({ model: "claude46sonnetthinking", incognito: true }, configPath);
+    await saveConfig({ model: "claude46sonnetthinking" }, configPath);
 
     const raw = await readFile(configPath, "utf8");
     const parsed = JSON.parse(raw);
     expect(parsed.model).toBe("claude46sonnetthinking");
-    expect(parsed.incognito).toBe(true);
 
     const stats = await stat(configPath);
     expect(stats.mode & 0o777).toBe(0o600);
@@ -86,46 +84,23 @@ describe("saveConfig", () => {
   });
 });
 
-describe("resolveSearchDefaults", () => {
-  test("returns hardcoded defaults when no config, env, or params", () => {
-    const result = resolveSearchDefaults({}, {});
-    expect(result.model).toBe("pplx_pro_upgraded");
-    expect(result.incognito).toBe(true);
+describe("resolveDefaultModel", () => {
+  test("returns hardcoded default when no config or env", () => {
+    expect(resolveDefaultModel({})).toBe("pplx_pro_upgraded");
   });
 
-  test("config file values override defaults", () => {
-    const result = resolveSearchDefaults({}, { model: "gpt54", incognito: false });
-    expect(result.model).toBe("gpt54");
-    expect(result.incognito).toBe(false);
+  test("config file model overrides default", () => {
+    expect(resolveDefaultModel({ model: "gpt54" })).toBe("gpt54");
   });
 
-  test("env var '0' disables incognito", () => {
-    const original = process.env.PI_PERPLEXITY_INCOGNITO;
-    try {
-      process.env.PI_PERPLEXITY_INCOGNITO = "0";
-      const result = resolveSearchDefaults({}, {});
-      expect(result.incognito).toBe(false);
-    } finally {
-      if (original === undefined) delete process.env.PI_PERPLEXITY_INCOGNITO;
-      else process.env.PI_PERPLEXITY_INCOGNITO = original;
-    }
-  });
-
-  test("env vars override config file", () => {
+  test("env var overrides config file", () => {
     const originalModel = process.env.PI_PERPLEXITY_MODEL;
-    const originalIncognito = process.env.PI_PERPLEXITY_INCOGNITO;
     try {
       process.env.PI_PERPLEXITY_MODEL = "experimental";
-      process.env.PI_PERPLEXITY_INCOGNITO = "false";
-
-      const result = resolveSearchDefaults({}, { model: "gpt54", incognito: true });
-      expect(result.model).toBe("experimental");
-      expect(result.incognito).toBe(false);
+      expect(resolveDefaultModel({ model: "gpt54" })).toBe("experimental");
     } finally {
       if (originalModel === undefined) delete process.env.PI_PERPLEXITY_MODEL;
       else process.env.PI_PERPLEXITY_MODEL = originalModel;
-      if (originalIncognito === undefined) delete process.env.PI_PERPLEXITY_INCOGNITO;
-      else process.env.PI_PERPLEXITY_INCOGNITO = originalIncognito;
     }
   });
 
@@ -133,26 +108,7 @@ describe("resolveSearchDefaults", () => {
     const originalModel = process.env.PI_PERPLEXITY_MODEL;
     try {
       process.env.PI_PERPLEXITY_MODEL = "   ";
-
-      const result = resolveSearchDefaults({}, { model: "gpt54" });
-      expect(result.model).toBe("gpt54");
-    } finally {
-      if (originalModel === undefined) delete process.env.PI_PERPLEXITY_MODEL;
-      else process.env.PI_PERPLEXITY_MODEL = originalModel;
-    }
-  });
-
-  test("per-call incognito overrides env/config without exposing model override", () => {
-    const originalModel = process.env.PI_PERPLEXITY_MODEL;
-    try {
-      process.env.PI_PERPLEXITY_MODEL = "experimental";
-
-      const result = resolveSearchDefaults(
-        { incognito: false },
-        { model: "gpt54", incognito: true },
-      );
-      expect(result.model).toBe("experimental");
-      expect(result.incognito).toBe(false);
+      expect(resolveDefaultModel({ model: "gpt54" })).toBe("gpt54");
     } finally {
       if (originalModel === undefined) delete process.env.PI_PERPLEXITY_MODEL;
       else process.env.PI_PERPLEXITY_MODEL = originalModel;

@@ -50,7 +50,6 @@ describe("Perplexity model selection e2e", () => {
           {
             query: "Say exactly OK",
             model,
-            incognito: true,
           },
           token,
         );

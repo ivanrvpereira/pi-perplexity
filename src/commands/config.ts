@@ -8,12 +8,11 @@ import {
 } from "../config.js";
 import { KNOWN_MODELS } from "../search/models.js";
 
-function formatCurrentConfig(config: { model?: string; incognito?: boolean }): string {
+function formatCurrentConfig(config: { model?: string }): string {
   const model = config.model ?? "pplx_pro_upgraded (default)";
   const modelLabel = KNOWN_MODELS.find((m) => m.value === config.model)?.label;
   const modelDisplay = modelLabel ? `${model} (${modelLabel})` : model;
-  const incognito = config.incognito ?? true;
-  return `Model: ${modelDisplay}\nIncognito: ${incognito}`;
+  return `Model: ${modelDisplay}`;
 }
 
 function formatModelOption(model: { value: string; label: string }, currentModel?: string): string {
@@ -43,7 +42,7 @@ export function registerPerplexityConfigCommand(
     handler: async (args, ctx) => {
       if (args.trim() === "--help" || args.trim() === "-h") {
         ctx.ui.notify(
-          `Usage: /perplexity-config [--show]\n\nInteractively set default model and incognito mode.\nConfig stored at: ${deps.getConfigPath()}`,
+          `Usage: /perplexity-config [--show]\n\nInteractively set the default model.\nConfig stored at: ${deps.getConfigPath()}`,
           "info",
         );
         return;
@@ -67,17 +66,7 @@ export function registerPerplexityConfigCommand(
         const selectedModel = KNOWN_MODELS.find((model) => model.label === normalizedSelection)?.value
           ?? normalizedSelection;
 
-        const incognito = await ctx.ui.confirm(
-          "Incognito mode",
-          "Hide searches from Perplexity web history? (recommended)",
-        );
-        if (incognito === undefined || incognito === null) {
-          ctx.ui.notify("Perplexity config unchanged.", "info");
-          return;
-        }
-
         config.model = selectedModel;
-        config.incognito = incognito;
 
         await deps.saveConfig(config);
         ctx.ui.notify(`Perplexity config saved:\n${formatCurrentConfig(config)}`, "info");

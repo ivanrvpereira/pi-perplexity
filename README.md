@@ -75,7 +75,6 @@ Once installed, the agent automatically calls `perplexity_search` whenever it ne
 | `query` | string | ✅ | The search query |
 | `recency` | string | — | Filter by age: `hour` · `day` · `week` · `month` · `year` |
 | `limit` | number | — | Max sources to include (1–50) |
-| `incognito` | boolean | — | Whether to hide the search from Perplexity history; defaults to `true` |
 
 Model selection is configured globally with `/perplexity-config` or `PI_PERPLEXITY_MODEL`; it is not exposed as a tool parameter, so agent-generated tool calls cannot accidentally override your configured model.
 
@@ -102,7 +101,7 @@ Provider: perplexity (oauth)
 Model: pplx_pro_upgraded
 ```
 
-Queries default to `is_incognito: true`, but you can override that per call or via config.
+Queries always send `is_incognito: true`, so searches never appear in your Perplexity web history.
 
 ## How It Works
 

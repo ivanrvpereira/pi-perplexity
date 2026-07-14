@@ -10,8 +10,8 @@ describe("perplexity_search execute", () => {
   test("includes effective config values in the search request and result details", async () => {
     const authenticate = mock(async () => "jwt-token");
     const saveBrowserAuthInput = mock(async () => ({ type: "oauth", access: "jwt-token" }));
-    const loadConfig = mock(async () => ({ model: "gpt54", incognito: false }));
-    const resolveSearchDefaults = mock(() => ({ model: "gpt54", incognito: false }));
+    const loadConfig = mock(async () => ({ model: "gpt54" }));
+    const resolveDefaultModel = mock(() => "gpt54");
     const searchPerplexity = mock(async () => ({
       answer: "answer",
       sources: [{ url: "https://example.com" }],
@@ -23,7 +23,7 @@ describe("perplexity_search execute", () => {
     mock.module("../src/config.js", () => ({
       getConfigPath: () => "/tmp/pi-perplexity-config.json",
       loadConfig,
-      resolveSearchDefaults,
+      resolveDefaultModel,
       saveConfig: mock(async () => undefined),
     }));
     mock.module("../src/search/client.js", () => ({ searchPerplexity }));
@@ -45,6 +45,7 @@ describe("perplexity_search execute", () => {
 
     expect(execute).toBeDefined();
     expect(JSON.stringify(parameters)).not.toContain("model");
+    expect(JSON.stringify(parameters)).not.toContain("incognito");
 
     const result = await execute!(
       "tool-1",
@@ -55,17 +56,15 @@ describe("perplexity_search execute", () => {
     );
 
     expect(loadConfig).toHaveBeenCalledTimes(1);
-    expect(resolveSearchDefaults).toHaveBeenCalledWith({}, { model: "gpt54", incognito: false });
+    expect(resolveDefaultModel).toHaveBeenCalledWith({ model: "gpt54" });
     expect(searchPerplexity).toHaveBeenCalledWith(
       {
         query: "how many planets",
         model: "gpt54",
-        incognito: false,
       },
       "jwt-token",
       undefined,
     );
-    expect(result.details.incognito).toBe(false);
     expect(result.details.model).toBe("gpt54");
   });
 
@@ -74,7 +73,7 @@ describe("perplexity_search execute", () => {
     const saveBrowserAuthInput = mock(async () => ({ type: "oauth", access: "jwt-token" }));
     const clearToken = mock(async () => undefined);
     const loadConfig = mock(async () => ({}));
-    const resolveSearchDefaults = mock(() => ({ model: "pplx_pro_upgraded", incognito: true }));
+    const resolveDefaultModel = mock(() => "pplx_pro_upgraded");
     const searchPerplexity = mock(async () => {
       throw new SearchError("AUTH", "Perplexity rejected authentication (401/403).");
     });
@@ -84,7 +83,7 @@ describe("perplexity_search execute", () => {
     mock.module("../src/config.js", () => ({
       getConfigPath: () => "/tmp/pi-perplexity-config.json",
       loadConfig,
-      resolveSearchDefaults,
+      resolveDefaultModel,
       saveConfig: mock(async () => undefined),
     }));
     mock.module("../src/search/client.js", () => ({ searchPerplexity }));

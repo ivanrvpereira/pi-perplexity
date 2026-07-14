@@ -45,7 +45,7 @@ node --no-deprecation --import ./node_modules/@earendil-works/pi-coding-agent/no
 
 - Endpoint: `POST https://www.perplexity.ai/rest/sse/perplexity_ask`.
 - Required Perplexity constants live in `src/constants.ts`.
-- Searches default to `is_incognito: true` to avoid polluting user history.
+- Searches always send `is_incognito: true` to avoid polluting user history; there is no toggle.
 - The response is `data:` JSON lines with `[DONE]`, not a fully standard SSE stream.
 - Events are incremental snapshots: shallow-merge top level, merge blocks by `intended_usage`, splice markdown via `chunk_starting_offset`, accumulate sources.
 - Completion is `event.final === true` or `event.status === "COMPLETED"`.
