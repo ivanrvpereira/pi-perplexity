@@ -8,6 +8,7 @@ const originalEmail = process.env.PI_PERPLEXITY_EMAIL;
 const originalOtp = process.env.PI_PERPLEXITY_OTP;
 const originalToken = process.env.PI_PERPLEXITY_TOKEN;
 const originalCookie = process.env.PI_PERPLEXITY_COOKIE;
+const originalPlatform = process.platform;
 
 function createJwt(expiryMs: number): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
@@ -28,6 +29,10 @@ function csrfHeaders(): [string, string][] {
 
 async function importLoginModule() {
   return import(`../../src/auth/login.js?test=${crypto.randomUUID()}`);
+}
+
+function setPlatform(platform: NodeJS.Platform): void {
+  Object.defineProperty(process, "platform", { value: platform });
 }
 
 function restoreEnv(): void {
@@ -66,10 +71,12 @@ afterEach(() => {
   mock.restore();
   globalThis.fetch = originalFetch;
   restoreEnv();
+  setPlatform(originalPlatform);
 });
 
 describe("auth/login", () => {
   test("extractFromDesktopApp returns null when defaults command fails", async () => {
+    setPlatform("darwin");
     const execFileMock = mock((...args: unknown[]) => {
       const callback = args[args.length - 1] as (
         error: Error | null,
@@ -91,6 +98,7 @@ describe("auth/login", () => {
   });
 
   test("extractFromDesktopApp returns JWT from defaults output", async () => {
+    setPlatform("darwin");
     const desktopToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
     const execFileMock = mock((...args: unknown[]) => {
       const callback = args[args.length - 1] as (
@@ -116,6 +124,7 @@ describe("auth/login", () => {
   });
 
   test("extractFromDesktopApp returns opaque token from defaults output", async () => {
+    setPlatform("darwin");
     const desktopToken = createOpaqueToken();
     const execFileMock = mock((...args: unknown[]) => {
       const callback = args[args.length - 1] as (
