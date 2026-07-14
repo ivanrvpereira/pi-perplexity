@@ -9,18 +9,16 @@ const theme = {
 } as any;
 
 describe("renderPerplexityCall", () => {
-  test("shows the selected model in the tool call row", () => {
+  test("shows query filters in the tool call row", () => {
     const rendered = renderPerplexityCall(
       {
         query: "latest Node release notes",
-        model: "claude46sonnetthinking",
         recency: "week",
         limit: 5,
       },
       theme,
     ).render(200).join("\n");
 
-    expect(rendered).toContain("claude46sonnetthinking");
     expect(rendered).toContain("week");
     expect(rendered).toContain("limit 5");
   });

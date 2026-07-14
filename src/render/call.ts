@@ -6,27 +6,19 @@ interface PerplexityCallArgs {
   query?: unknown;
   recency?: unknown;
   limit?: unknown;
-  model?: unknown;
   incognito?: unknown;
 }
 
-const RECENCY_VALUES = new Set(["hour", "day", "week", "month", "year"] as const);
+const RECENCY_VALUES: readonly string[] = ["hour", "day", "week", "month", "year"];
 export function renderPerplexityCall(args: PerplexityCallArgs, theme: Theme): Text {
   const query = asString(args?.query)?.trim();
   const recencyRaw = asString(args?.recency)?.trim().toLowerCase();
-  const recency = recencyRaw && RECENCY_VALUES.has(recencyRaw as (typeof RECENCY_VALUES extends Set<infer T> ? T : never))
-    ? recencyRaw
-    : undefined;
+  const recency = recencyRaw && RECENCY_VALUES.includes(recencyRaw) ? recencyRaw : undefined;
   const limit = asPositiveInteger(args?.limit);
-  const model = asString(args?.model)?.trim();
   const incognito = typeof args?.incognito === "boolean" ? args.incognito : undefined;
 
   let text = theme.fg("toolTitle", theme.bold("perplexity_search "));
   text += query ? theme.fg("muted", truncate(query, 90)) : theme.fg("warning", "(missing query)");
-
-  if (model) {
-    text += theme.fg("dim", ` • ${model}`);
-  }
 
   if (typeof incognito === "boolean") {
     text += theme.fg("dim", ` • incognito ${incognito ? "on" : "off"}`);

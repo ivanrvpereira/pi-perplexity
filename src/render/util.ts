@@ -13,16 +13,11 @@ export function asNumber(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-export function asPositiveNumber(value: unknown): number | undefined {
+export function asPositiveInteger(value: unknown): number | undefined {
 	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
 		return undefined;
 	}
-	return value;
-}
-
-export function asPositiveInteger(value: unknown): number | undefined {
-	const n = asPositiveNumber(value);
-	return n !== undefined ? Math.floor(n) : undefined;
+	return Math.floor(value);
 }
 
 export function truncate(text: string, maxLength: number): string {

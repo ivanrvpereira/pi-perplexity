@@ -73,9 +73,7 @@ export default function (pi: ExtensionAPI) {
 
         const config = await loadConfig();
         const { model, incognito } = resolveSearchDefaults(
-          {
-            ...(params.incognito !== undefined ? { incognito: params.incognito } : {}),
-          },
+          params.incognito !== undefined ? { incognito: params.incognito } : {},
           config,
         );
 
@@ -85,7 +83,6 @@ export default function (pi: ExtensionAPI) {
             model,
             incognito,
             ...(params.recency !== undefined ? { recency: params.recency } : {}),
-            ...(params.limit !== undefined ? { limit: params.limit } : {}),
           },
           auth,
           signal,

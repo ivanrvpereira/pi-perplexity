@@ -6,7 +6,7 @@ import { join } from "node:path";
 let loadConfig: (configPath?: string) => Promise<import("../src/config.js").PerplexityConfig>;
 let saveConfig: (config: import("../src/config.js").PerplexityConfig, configPath?: string) => Promise<void>;
 let resolveSearchDefaults: (
-  params: { model?: string; incognito?: boolean },
+  params: { incognito?: boolean },
   config: import("../src/config.js").PerplexityConfig,
 ) => { model: string; incognito: boolean };
 
@@ -142,16 +142,16 @@ describe("resolveSearchDefaults", () => {
     }
   });
 
-  test("per-call params override everything", () => {
+  test("per-call incognito overrides env/config without exposing model override", () => {
     const originalModel = process.env.PI_PERPLEXITY_MODEL;
     try {
       process.env.PI_PERPLEXITY_MODEL = "experimental";
 
       const result = resolveSearchDefaults(
-        { model: "claude46sonnetthinking", incognito: false },
+        { incognito: false },
         { model: "gpt54", incognito: true },
       );
-      expect(result.model).toBe("claude46sonnetthinking");
+      expect(result.model).toBe("experimental");
       expect(result.incognito).toBe(false);
     } finally {
       if (originalModel === undefined) delete process.env.PI_PERPLEXITY_MODEL;

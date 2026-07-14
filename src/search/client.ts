@@ -9,7 +9,6 @@ const PERPLEXITY_ENDPOINT = "https://www.perplexity.ai/rest/sse/perplexity_ask";
 export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
-  limit?: number;
   model: string;
   incognito: boolean;
 }

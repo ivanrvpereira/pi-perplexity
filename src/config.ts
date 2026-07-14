@@ -48,22 +48,15 @@ export async function saveConfig(config: PerplexityConfig, configPath: string = 
   await chmod(configPath, 0o600);
 }
 
-/**
- * Resolve effective values using priority: per-call param > env var > config file > default.
- * Returns the model and incognito values to use for a search.
- */
+/** Resolve effective search defaults from env vars, config file, and per-call incognito override. */
 export function resolveSearchDefaults(
-  params: { model?: string; incognito?: boolean },
+  params: { incognito?: boolean },
   config: PerplexityConfig,
 ): { model: string; incognito: boolean } {
   const envModel = process.env.PI_PERPLEXITY_MODEL?.trim() || undefined;
   const envIncognito = process.env.PI_PERPLEXITY_INCOGNITO || undefined;
 
-  const model = params.model
-    ?? envModel
-    ?? config.model
-    ?? "pplx_pro_upgraded";
-
+  const model = envModel ?? config.model ?? "pplx_pro_upgraded";
   const incognito = params.incognito
     ?? (envIncognito !== undefined ? envIncognito !== "false" && envIncognito !== "0" : undefined)
     ?? config.incognito
