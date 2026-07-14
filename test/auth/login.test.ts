@@ -442,35 +442,6 @@ describe("auth/login", () => {
     expect(saveTokenMock).toHaveBeenCalledTimes(0);
   });
 
-  test("authenticate falls back to browser auth when OTP CSRF hits Cloudflare", async () => {
-    process.env.PI_AUTH_NO_BORROW = "1";
-    const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
-
-    const loadTokenMock = mock(async () => null);
-    const saveTokenMock = mock(async (_token: StoredToken) => undefined);
-    const clearTokenMock = mock(async () => undefined);
-
-    mock.module("../../src/auth/storage.js", () => ({
-      loadToken: loadTokenMock,
-      saveToken: saveTokenMock,
-      clearToken: clearTokenMock,
-    }));
-
-    const fetchMock = mock(async () =>
-      new Response("<!DOCTYPE html><title>Just a moment...</title>", { status: 403 }),
-    );
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    const { authenticate } = await importLoginModule();
-
-    const token = await authenticate({
-      promptForEmail: async () => "user@example.com",
-      promptForBrowserAuth: async () => `__Secure-next-auth.session-token=${browserToken}; cf_clearance=ok`,
-    });
-
-    expect(token.cookies).toContain("cf_clearance=ok");
-    expect(saveTokenMock).toHaveBeenCalledTimes(1);
-  });
   test("authenticate throws NO_TOKEN when no cached token and no OTP email input", async () => {
     process.env.PI_AUTH_NO_BORROW = "1";
 

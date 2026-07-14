@@ -5,7 +5,6 @@ import { Type } from "@sinclair/typebox";
 import { registerPerplexityConfigCommand } from "./commands/config.js";
 import { registerPerplexityCommands } from "./commands/login.js";
 
-import { browserLoginInstructions } from "./auth/browser.js";
 import { authenticate } from "./auth/login.js";
 import { loadConfig, resolveSearchDefaults } from "./config.js";
 import { formatForLLM } from "./search/format.js";
@@ -58,13 +57,6 @@ export default function (pi: ExtensionAPI) {
           ...(signal !== undefined ? { signal } : {}),
           promptForEmail: async () => promptInput("Perplexity email", "you@example.com"),
           promptForOtp: async (email) => promptInput(`Enter OTP sent to ${email}`, "123456"),
-          promptForBrowserAuth: async () => {
-            ctx?.ui?.notify?.(browserLoginInstructions(), "info");
-            return promptInput(
-              "Paste copied cURL command or Cookie header",
-              "curl 'https://www.perplexity.ai/' -H 'Cookie: ...'",
-            );
-          },
         });
 
         if (signal?.aborted) {

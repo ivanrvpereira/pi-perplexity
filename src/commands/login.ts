@@ -107,7 +107,7 @@ export function registerPerplexityCommands(pi: ExtensionAPI): void {
           return;
         }
 
-        await authenticate({ promptForEmail, promptForOtp, promptForBrowserAuth });
+        await authenticate({ promptForEmail, promptForOtp });
         ctx.ui.notify("Perplexity login successful. Token saved.", "info");
       } catch (error) {
         if (error instanceof AuthError && error.code === "NO_TOKEN") {

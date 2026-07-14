@@ -39,7 +39,6 @@ export interface AuthenticateOptions {
   signal?: AbortSignal;
   promptForEmail?: () => Promise<string | null | undefined>;
   promptForOtp?: (email: string) => Promise<string | null | undefined>;
-  promptForBrowserAuth?: () => Promise<string | null | undefined>;
 }
 
 function normalizeInput(value: string | null | undefined): string | null {
@@ -89,16 +88,6 @@ export async function saveBrowserAuthInput(input: string): Promise<StoredToken> 
 
   await saveToken(credentials);
   return credentials;
-}
-
-async function promptForBrowserCredentials(
-  options: AuthenticateOptions,
-): Promise<StoredToken | null> {
-  const input = normalizeInput(await options.promptForBrowserAuth?.());
-  if (!input) {
-    return null;
-  }
-  return saveBrowserAuthInput(input);
 }
 
 function buildAuthHeaders(includeJsonContentType = false): Record<string, string> {
@@ -297,11 +286,6 @@ export async function authenticate(options: AuthenticateOptions = {}): Promise<S
     normalizeInput(process.env.PI_PERPLEXITY_EMAIL) ??
     normalizeInput(await options.promptForEmail?.());
   if (!email) {
-    const browserCredentials = await promptForBrowserCredentials(options);
-    if (browserCredentials) {
-      return browserCredentials;
-    }
-
     throw new AuthError(
       "NO_TOKEN",
       `Could not find a desktop token, browser token/cookie, or email for OTP fallback. ${DESKTOP_AUTH_HELP} ${OTP_AUTH_HELP} ${BROWSER_AUTH_HELP}`,
@@ -315,13 +299,6 @@ export async function authenticate(options: AuthenticateOptions = {}): Promise<S
   } catch (error) {
     if (error instanceof AuthError) {
       throw error;
-    }
-
-    if (error instanceof BrowserChallengeError) {
-      const browserCredentials = await promptForBrowserCredentials(options);
-      if (browserCredentials) {
-        return browserCredentials;
-      }
     }
 
     throw new AuthError(
