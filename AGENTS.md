@@ -2,16 +2,16 @@
 
 ## Stack
 
-- TypeScript extension for `@mariozechner/pi-coding-agent`; loaded directly via jiti, no build artifact.
+- TypeScript extension for `@earendil-works/pi-coding-agent`; loaded directly via jiti, no build artifact.
 - Node >=18.14.1 runtime APIs only: `fetch`, `crypto.randomUUID()`, `Buffer.from(..., "base64url")`, `Intl`.
-- Pi-bundled packages live in `peerDependencies` with `"*"`: `@mariozechner/pi-tui`, `@mariozechner/pi-ai`, `@sinclair/typebox`.
+- Pi-bundled packages live in `peerDependencies` with `"*"`: `@earendil-works/pi-tui`, `@earendil-works/pi-ai`. `Type` is re-exported by `@earendil-works/pi-ai`; do not depend on `typebox` directly.
 
 ## Commands
 
 ```bash
 npm run typecheck
 npm test
-node --import @mariozechner/jiti/register --input-type=module -e "import('./src/index.ts').then((m)=>{ const entry = m.default?.default ?? m.default; if (typeof entry !== 'function') throw new Error('default export missing'); })"
+node --no-deprecation --import ./node_modules/@earendil-works/pi-coding-agent/node_modules/jiti/lib/jiti-register.mjs --input-type=module -e "import('./src/index.ts').then((m)=>{ const entry = m.default?.default ?? m.default; if (typeof entry !== 'function') throw new Error('default export missing'); })"
 ```
 
 ## File-Scoped Commands
@@ -38,7 +38,7 @@ node --import @mariozechner/jiti/register --input-type=module -e "import('./src/
 - Tool name is `perplexity_search`.
 - Tool `execute` signature is `(toolCallId, params, signal, onUpdate, ctx)`.
 - Tool results use `{ content: [{ type: "text", text }], details: { ... } }`.
-- String enum params use `StringEnum` from `@mariozechner/pi-ai`; `Type.Union([Type.Literal(...)])` breaks Google models.
+- String enum params use `StringEnum` from `@earendil-works/pi-ai`; `Type.Union([Type.Literal(...)])` breaks Google models.
 - Stream/API types stay loose: all reverse-engineered event fields are optional.
 
 ## Perplexity Protocol Gotchas
