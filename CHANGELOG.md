@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.0] - 2026-07-14
+
+### Changed
+
+- Migrated to the renamed pi packages: `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `@earendil-works/pi-ai` (formerly `@mariozechner/*`). Peer dependencies now require the `@earendil-works` scope, and `@sinclair/typebox` is no longer a peer dependency (`Type` comes from `@earendil-works/pi-ai`).
+
+### Fixed
+
+- `PI_PERPLEXITY_COOKIE` / `PI_PERPLEXITY_COOKIES` now accept a bare `__Secure-next-auth.session-token` value, matching what `/perplexity-login --browser` accepts.
+
 ### CI
 
 - Restrict npm publishing to tags whose commit is already on `main`.
+- Disable checkout credential persistence and pin actions to commit SHAs.
+- Add Dependabot configuration for npm and GitHub Actions dependencies.
+
+### Documentation
+
+- Add `SECURITY.md` with private vulnerability reporting instructions.
 
 ## [0.2.5] - 2026-07-14
 
