@@ -279,6 +279,38 @@ describe("searchPerplexity", () => {
     expect(textResult.answer).toBe("text fallback");
   });
 
+  test("prefers user_selected_model over display_model unless it is turbo", async () => {
+    globalThis.fetch = (async () =>
+      createSseResponse([
+        {
+          status: "COMPLETED",
+          final: true,
+          text: "answer",
+          display_model: "turbo",
+          user_selected_model: "claude50sonnetthinking",
+          sources_list: [{ title: "S", url: "https://example.com" }],
+        },
+      ])) as unknown as typeof fetch;
+
+    const preferred = await searchPerplexity({ query: "q", model: "claude50sonnetthinking" }, "jwt");
+    expect(preferred.displayModel).toBe("claude50sonnetthinking");
+
+    globalThis.fetch = (async () =>
+      createSseResponse([
+        {
+          status: "COMPLETED",
+          final: true,
+          text: "answer",
+          display_model: "pplx_pro_upgraded",
+          user_selected_model: "turbo",
+          sources_list: [{ title: "S", url: "https://example.com" }],
+        },
+      ])) as unknown as typeof fetch;
+
+    const fallback = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
+    expect(fallback.displayModel).toBe("pplx_pro_upgraded");
+  });
+
   test("returns EMPTY error when response has no answer and no sources", async () => {
     globalThis.fetch = (async () =>
       createSseResponse([{ status: "COMPLETED", final: true }])) as unknown as typeof fetch;

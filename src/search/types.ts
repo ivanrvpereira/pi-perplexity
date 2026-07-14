@@ -7,6 +7,7 @@ export interface StreamEvent {
   blocks?: StreamBlock[];
   sources_list?: StreamSource[];
   display_model?: string;
+  user_selected_model?: string;
   uuid?: string;
   error_code?: string;
   error_message?: string;

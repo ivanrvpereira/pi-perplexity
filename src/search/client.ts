@@ -284,7 +284,13 @@ export async function searchPerplexity(
     answer: answer || "No answer text returned by Perplexity.",
     sources,
   };
-  if (snapshot.display_model !== undefined) result.displayModel = snapshot.display_model;
+  // Prefer user_selected_model: display_model may report "turbo" even when the
+  // requested model was honored (see issue #7).
+  const reportedModel =
+    snapshot.user_selected_model && snapshot.user_selected_model !== "turbo"
+      ? snapshot.user_selected_model
+      : snapshot.display_model;
+  if (reportedModel !== undefined) result.displayModel = reportedModel;
   if (snapshot.uuid !== undefined) result.uuid = snapshot.uuid;
 
   return result;
