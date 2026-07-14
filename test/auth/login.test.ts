@@ -342,7 +342,7 @@ describe("auth/login", () => {
   -H 'cookie: pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance' \\
   --data-raw '{"query":"hello"}'`;
 
-    const { parseBrowserAuthInput } = await importLoginModule();
+    const { parseBrowserAuthInput } = await import("../../src/auth/browser.js");
     const parsed = parseBrowserAuthInput(curl);
 
     expect(parsed?.cookies).toBe(
@@ -357,7 +357,7 @@ describe("auth/login", () => {
   --cookie='pplx.visitor-id=visitor; __Secure-next-auth.session-token=${browserToken}; cf_clearance=clearance' \\
   --data-raw '{"query":"hello"}'`;
 
-    const { parseBrowserAuthInput } = await importLoginModule();
+    const { parseBrowserAuthInput } = await import("../../src/auth/browser.js");
     const parsed = parseBrowserAuthInput(curl);
 
     expect(parsed?.cookies).toBe(
@@ -368,7 +368,7 @@ describe("auth/login", () => {
 
   test("parseBrowserAuthInput extracts cookies from unquoted -b and --cookie cURL forms", async () => {
     const browserToken = createJwt(Date.now() + 2 * 60 * 60 * 1000);
-    const { parseBrowserAuthInput } = await importLoginModule();
+    const { parseBrowserAuthInput } = await import("../../src/auth/browser.js");
 
     for (const flag of ["-b", "--cookie"]) {
       const curl = `curl 'https://www.perplexity.ai/rest/sse/perplexity_ask' ${flag} __Secure-next-auth.session-token=${browserToken}`;

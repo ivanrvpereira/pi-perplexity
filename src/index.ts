@@ -7,11 +7,11 @@ import { registerPerplexityCommands } from "./commands/login.js";
 
 import { authenticate } from "./auth/login.js";
 import { loadConfig, resolveSearchDefaults } from "./config.js";
-import { formatForLLM } from "./search/format.js";
+import { effectiveSourceCount, formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
 import { renderPerplexityResult } from "./render/result.js";
-import { errorMessage } from "./render/util.js";
+import { errorMessage } from "./util.js";
 import { AuthError, SearchError } from "./search/types.js";
 
 export default function (pi: ExtensionAPI) {
@@ -89,10 +89,7 @@ export default function (pi: ExtensionAPI) {
         );
 
         const formatted = formatForLLM(result, params.limit);
-        sourceCount =
-          typeof params.limit === "number"
-            ? Math.min(params.limit, result.sources.length)
-            : result.sources.length;
+        sourceCount = effectiveSourceCount(result.sources.length, params.limit);
 
         return {
           content: [{ type: "text", text: formatted }],

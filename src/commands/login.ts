@@ -4,7 +4,7 @@ import { browserLoginInstructions } from "../auth/browser.js";
 import { authenticate, saveBrowserAuthInput } from "../auth/login.js";
 import { clearToken } from "../auth/storage.js";
 import { AuthError } from "../search/types.js";
-import { errorMessage } from "../render/util.js";
+import { errorMessage } from "../util.js";
 
 const LOGIN_COMMAND_NAME = "perplexity-login";
 

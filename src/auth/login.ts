@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import { AuthError, type StoredToken } from "../search/types.js";
-import { errorMessage } from "../render/util.js";
+import { errorMessage } from "../util.js";
 import { loadToken, saveToken } from "./storage.js";
 import {
   BROWSER_AUTH_HELP,
@@ -16,8 +16,6 @@ import {
   type PerplexityFetchResponse as AuthFetchResponse,
 } from "../perplexity-fetch.js";
 
-export { parseBrowserAuthInput } from "./browser.js";
-
 const DESKTOP_AUTH_HELP =
   "Install the Perplexity desktop app and sign in, or set PI_AUTH_NO_BORROW=1 to skip desktop token borrowing.";
 const OTP_AUTH_HELP =
@@ -27,13 +25,6 @@ const TOKEN_ENV_KEYS = ["PI_PERPLEXITY_TOKEN", "PI_PERPLEXITY_AUTH_TOKEN"] as co
 const COOKIE_ENV_KEYS = ["PI_PERPLEXITY_COOKIE", "PI_PERPLEXITY_COOKIES"] as const;
 
 const execFileAsync = promisify(execFile);
-
-class BrowserChallengeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BrowserChallengeError";
-  }
-}
 
 export interface AuthenticateOptions {
   signal?: AbortSignal;
@@ -130,9 +121,7 @@ function isBrowserChallengeResponse(response: AuthFetchResponse): boolean {
 function throwHttpFailure(action: string, response: AuthFetchResponse): never {
   const failure = formatHttpFailure(action, response);
   if (isBrowserChallengeResponse(response)) {
-    throw new BrowserChallengeError(
-      `${failure} Perplexity returned a browser challenge that Node fetch cannot solve.`,
-    );
+    throw new Error(`${failure} Perplexity returned a browser challenge that Node fetch cannot solve.`);
   }
 
   throw new Error(failure);
@@ -256,7 +245,7 @@ export async function extractFromDesktopApp(): Promise<string | null> {
   }
 }
 
-/** Run auth strategy: load cached → env token/cookies → desktop extraction → email OTP → browser paste fallback. */
+/** Run auth strategy: load cached → env token/cookies → desktop extraction → email OTP. Browser paste is handled via /perplexity-login --browser. */
 export async function authenticate(options: AuthenticateOptions = {}): Promise<StoredToken> {
   const cached = await loadToken();
   if (cached) {
