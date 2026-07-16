@@ -284,12 +284,14 @@ export async function searchPerplexity(
     answer: answer || "No answer text returned by Perplexity.",
     sources,
   };
-  // Prefer user_selected_model: display_model may report "turbo" even when the
-  // requested model was honored (see issue #7).
+  // The stream's model fields are inconsistent: either user_selected_model or
+  // display_model may report "turbo" even when the requested model was honored
+  // (see issue #7). Prefer whichever is present and not "turbo"; if both are
+  // missing or "turbo", fall back to the requested model.
   const reportedModel =
-    snapshot.user_selected_model && snapshot.user_selected_model !== "turbo"
-      ? snapshot.user_selected_model
-      : snapshot.display_model;
+    [snapshot.user_selected_model, snapshot.display_model].find(
+      (model) => model && model !== "turbo",
+    ) ?? params.model;
   if (reportedModel !== undefined) result.displayModel = reportedModel;
   if (snapshot.uuid !== undefined) result.uuid = snapshot.uuid;
 

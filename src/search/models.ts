@@ -35,4 +35,5 @@ export const KNOWN_MODELS: ModelOption[] = [
   { value: "grok4", label: "Grok 4 Thinking" },
   { value: "nv_nemotron_3_super", label: "Nemotron 3 Super" },
   { value: "kimik25thinking", label: "Kimi K2.5 Thinking" },
+  { value: "glm_5_2", label: "GLM-5.2" },
 ];
