@@ -309,6 +309,21 @@ describe("searchPerplexity", () => {
 
     const fallback = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
     expect(fallback.displayModel).toBe("pplx_pro_upgraded");
+
+    globalThis.fetch = (async () =>
+      createSseResponse([
+        {
+          status: "COMPLETED",
+          final: true,
+          text: "answer",
+          display_model: "turbo",
+          user_selected_model: "turbo",
+          sources_list: [{ title: "S", url: "https://example.com" }],
+        },
+      ])) as unknown as typeof fetch;
+
+    const requested = await searchPerplexity({ query: "q", model: "glm_5_2" }, "jwt");
+    expect(requested.displayModel).toBe("glm_5_2");
   });
 
   test("returns EMPTY error when response has no answer and no sources", async () => {
