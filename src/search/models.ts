@@ -16,6 +16,8 @@ export const KNOWN_MODELS: ModelOption[] = [
   { value: "gpt52_pro", label: "GPT-5.2 Pro" },
   { value: "gpt51", label: "GPT-5.1" },
   { value: "gpt51_thinking", label: "GPT-5.1 Thinking" },
+  { value: "claude50sonnet", label: "Claude Sonnet 5" },
+  { value: "claude50sonnetthinking", label: "Claude Sonnet 5 Thinking" },
   { value: "claude46sonnet", label: "Claude 4.6 Sonnet" },
   { value: "claude46sonnetthinking", label: "Claude 4.6 Sonnet Thinking" },
   { value: "claude47opus", label: "Claude 4.7 Opus" },
