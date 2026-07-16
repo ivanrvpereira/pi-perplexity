@@ -5,7 +5,7 @@ import { registerPerplexityConfigCommand } from "./commands/config.js";
 import { registerPerplexityCommands } from "./commands/login.js";
 
 import { authenticate } from "./auth/login.js";
-import { loadConfig, resolveSearchDefaults } from "./config.js";
+import { loadConfig, resolveDefaultModel } from "./config.js";
 import { effectiveSourceCount, formatForLLM } from "./search/format.js";
 import { searchPerplexity } from "./search/client.js";
 import { renderPerplexityCall } from "./render/call.js";
@@ -30,7 +30,6 @@ export default function (pi: ExtensionAPI) {
       limit: Type.Optional(
         Type.Number({ description: "Max sources to return", minimum: 1, maximum: 50 }),
       ),
-      incognito: Type.Optional(Type.Boolean({ description: "Hide search from Perplexity history" })),
     }),
     renderCall: renderPerplexityCall,
     renderResult: renderPerplexityResult,
@@ -71,16 +70,12 @@ export default function (pi: ExtensionAPI) {
         });
 
         const config = await loadConfig();
-        const { model, incognito } = resolveSearchDefaults(
-          params.incognito !== undefined ? { incognito: params.incognito } : {},
-          config,
-        );
+        const model = resolveDefaultModel(config);
 
         const result = await searchPerplexity(
           {
             query: params.query,
             model,
-            incognito,
             ...(params.recency !== undefined ? { recency: params.recency } : {}),
           },
           auth,
@@ -94,7 +89,6 @@ export default function (pi: ExtensionAPI) {
           content: [{ type: "text", text: formatted }],
           details: {
             model: result.displayModel,
-            incognito,
             sourceCount,
             queryMs: Date.now() - start,
             uuid: result.uuid,

@@ -12,7 +12,6 @@ export interface SearchParams {
   query: string;
   recency?: "hour" | "day" | "week" | "month" | "year";
   model: string;
-  incognito: boolean;
 }
 
 function normalizeUrl(url: string): string {
@@ -132,7 +131,7 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
       language: "en-US",
       timezone,
       search_recency_filter: params.recency ?? null,
-      is_incognito: params.incognito,
+      is_incognito: true,
       use_schematized_api: true,
       skip_search_enabled: true,
     },

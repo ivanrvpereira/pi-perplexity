@@ -57,7 +57,7 @@ describe("searchPerplexity", () => {
 
     const controller = new AbortController();
     const result = await searchPerplexity(
-      { query: "latest Node release notes", recency: "week", model: "pplx_pro_upgraded", incognito: true },
+      { query: "latest Node release notes", recency: "week", model: "pplx_pro_upgraded" },
       "jwt-token",
       controller.signal,
     );
@@ -98,7 +98,7 @@ describe("searchPerplexity", () => {
     expect(result.sources).toHaveLength(1);
   });
 
-  test("passes model and incognito through to request body", async () => {
+  test("passes model through to request body", async () => {
     let capturedInit: RequestInit | undefined;
 
     globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
@@ -109,15 +109,14 @@ describe("searchPerplexity", () => {
     }) as unknown as typeof fetch;
 
     await searchPerplexity(
-      { query: "q", model: "claude46sonnetthinking", incognito: false },
+      { query: "q", model: "claude46sonnetthinking" },
       "jwt-token",
     );
 
     const body = JSON.parse(String(capturedInit?.body)) as {
-      params: { model_preference: string; is_incognito: boolean };
+      params: { model_preference: string };
     };
     expect(body.params.model_preference).toBe("claude46sonnetthinking");
-    expect(body.params.is_incognito).toBe(false);
   });
 
   test("uses Cookie header for browser-cookie credentials", async () => {
@@ -131,7 +130,7 @@ describe("searchPerplexity", () => {
     }) as unknown as typeof fetch;
 
     await searchPerplexity(
-      { query: "q", model: "pplx_pro_upgraded", incognito: true },
+      { query: "q", model: "pplx_pro_upgraded" },
       { type: "oauth", cookies: "__Secure-next-auth.session-token=session; cf_clearance=clearance" },
     );
 
@@ -140,7 +139,7 @@ describe("searchPerplexity", () => {
     expect(headers.get("Authorization")).toBeNull();
   });
 
-  test("passes incognito true through to request body", async () => {
+  test("always sends is_incognito true", async () => {
     let capturedInit: RequestInit | undefined;
 
     globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
@@ -150,7 +149,7 @@ describe("searchPerplexity", () => {
       ]);
     }) as unknown as typeof fetch;
 
-    await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt-token");
+    await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt-token");
 
     const body = JSON.parse(String(capturedInit?.body)) as {
       params: { is_incognito: boolean };
@@ -175,7 +174,7 @@ describe("searchPerplexity", () => {
         headers: { "content-type": "text/event-stream" },
       })) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
 
     expect(result.answer).toBe("answer");
     expect(cancelCalled).toBe(true);
@@ -185,7 +184,7 @@ describe("searchPerplexity", () => {
     for (const status of [401, 403]) {
       globalThis.fetch = (async () => new Response("auth fail", { status })) as unknown as typeof fetch;
 
-      await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt")).rejects.toMatchObject({
+      await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt")).rejects.toMatchObject({
         name: "SearchError",
         code: "AUTH",
       });
@@ -195,7 +194,7 @@ describe("searchPerplexity", () => {
   test("maps 429 responses to RATE_LIMIT error", async () => {
     globalThis.fetch = (async () => new Response("rate limited", { status: 429 })) as unknown as typeof fetch;
 
-    await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt")).rejects.toMatchObject({
+    await expect(searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt")).rejects.toMatchObject({
       name: "SearchError",
       code: "RATE_LIMIT",
     });
@@ -223,7 +222,7 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
 
     expect(result.sources).toHaveLength(2);
     expect(result.sources[0].url).toBe("https://example.com/path");
@@ -245,7 +244,7 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const result = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
     expect(result.answer).toBe("markdown answer");
   });
 
@@ -263,7 +262,7 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const askTextResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const askTextResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
     expect(askTextResult.answer).toBe("ask answer");
 
     globalThis.fetch = (async () =>
@@ -276,7 +275,7 @@ describe("searchPerplexity", () => {
         },
       ])) as unknown as typeof fetch;
 
-    const textResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+    const textResult = await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
     expect(textResult.answer).toBe("text fallback");
   });
 
@@ -286,7 +285,7 @@ describe("searchPerplexity", () => {
 
     let thrown: unknown;
     try {
-      await searchPerplexity({ query: "q", model: "pplx_pro_upgraded", incognito: true }, "jwt");
+      await searchPerplexity({ query: "q", model: "pplx_pro_upgraded" }, "jwt");
     } catch (error) {
       thrown = error;
     }
