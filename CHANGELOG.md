@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.4.0] - 2026-07-16
+
+### Added
+
+- Claude Sonnet 5, Claude Sonnet 5 Thinking, and GLM-5.2 are available as supported Perplexity models.
+
 ### Changed
 
 - Searches now always run with `is_incognito: true`. The `incognito` tool parameter, `PI_PERPLEXITY_INCOGNITO` env var, config file field, and `/perplexity-config` incognito prompt were removed; `/perplexity-config` now sets the default model only.
+- Prefer Perplexity's `user_selected_model` field to the inconsistent `display_model` field when reporting the model used.
+
+### CI
+
+- Update `actions/checkout` and `actions/setup-node` to v7.
 
 ## [0.3.0] - 2026-07-14
 
