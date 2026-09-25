@@ -140,6 +140,20 @@ function buildRequestBody(params: SearchParams): Record<string, unknown> {
 
 type AuthCredentials = string | StoredToken;
 
+/** Extract the Perplexity account id from stored cookies. The ask endpoint requires it as `x-pplx-account` to recognize the subscription. */
+function accountFromCookies(cookies: string | undefined): string | null {
+  if (!cookies) {
+    return null;
+  }
+
+  const lastActive = cookies.match(/__Host-pplx-last-active-account=([0-9a-f-]{36})/i)?.[1];
+  if (lastActive) {
+    return lastActive;
+  }
+
+  return cookies.match(/(?:__Secure-)?pplx\.session\.([0-9a-f-]{36})=/i)?.[1] ?? null;
+}
+
 function buildRequestHeaders(auth: AuthCredentials, requestId: string): Record<string, string> {
   const access = typeof auth === "string" ? auth : auth.access;
   const cookies = typeof auth === "string" ? undefined : auth.cookies;
@@ -157,6 +171,10 @@ function buildRequestHeaders(auth: AuthCredentials, requestId: string): Record<s
 
   if (cookies) {
     headers.Cookie = cookies;
+    const account = accountFromCookies(cookies);
+    if (account) {
+      headers["X-Pplx-Account"] = account;
+    }
   } else if (access) {
     headers.Authorization = `Bearer ${access}`;
   }

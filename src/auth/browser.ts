@@ -1,7 +1,7 @@
 import type { StoredToken } from "../search/types.js";
 
 export const BROWSER_AUTH_HELP =
-  "If direct OTP is blocked by Cloudflare, sign in at https://www.perplexity.ai in a browser, then run /perplexity-login --browser and paste the copied cURL command, the Cookie request header, or the __Secure-next-auth.session-token value.";
+  "If direct OTP is blocked by Cloudflare, sign in at https://www.perplexity.ai in a browser, then run /perplexity-login --browser and paste the copied cURL command, the Cookie request header, or the __Secure-pplx.session.<account-id> cookie value.";
 
 const SESSION_TOKEN_COOKIE_NAMES = [
   "__Secure-next-auth.session-token",
@@ -9,6 +9,10 @@ const SESSION_TOKEN_COOKIE_NAMES = [
   "perplexity_jwt",
   "pplx_jwt",
 ] as const;
+
+// Perplexity now issues per-account session cookies named
+// `__Secure-pplx.session.<account-id>` (NextAuth v4 style, JWE value).
+const SESSION_TOKEN_COOKIE_PATTERN = /^(?:__Secure-)?pplx\.session\.[^.]+$/;
 
 function normalizeInput(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -115,6 +119,17 @@ function cookieValueFromChunks(cookies: Map<string, string>, name: string): stri
 
 export function extractSessionTokenFromCookieHeader(cookieHeader: string): string | null {
   const cookies = parseCookieHeader(cookieHeader);
+
+  for (const [name, value] of cookies) {
+    if (!SESSION_TOKEN_COOKIE_PATTERN.test(name)) {
+      continue;
+    }
+    const token = normalizeInput(decodeCookieValue(value));
+    if (token) {
+      return token;
+    }
+  }
+
   for (const name of SESSION_TOKEN_COOKIE_NAMES) {
     const value = cookieValueFromChunks(cookies, name);
     const token = normalizeInput(value ? decodeCookieValue(value) : null);
@@ -170,7 +185,7 @@ export function browserAuthFailureMessage(input: string): string {
       "The cURL command you pasted does not include cookies, so it cannot be used for login.",
       "Copy a signed-in Perplexity request whose cURL contains `-b ...`, `--cookie ...`, or `-H 'Cookie: ...'`.",
       "In DevTools → Network, reload Perplexity or ask a question, then right-click a `www.perplexity.ai` request such as `perplexity_ask` → Copy → Copy as cURL.",
-      "Make sure the copied text contains `__Secure-next-auth.session-token` and ideally `cf_clearance`.",
+      "Make sure the copied text contains `__Secure-pplx.session.<account-id>` (or legacy `__Secure-next-auth.session-token`) and ideally `cf_clearance`.",
     ].join(" ");
   }
 
@@ -178,7 +193,7 @@ export function browserAuthFailureMessage(input: string): string {
   if (cookies && cookies.includes("=") && !extractSessionTokenFromCookieHeader(cookies)) {
     return [
       "I found cookies in the pasted value, but not a Perplexity signed-in session cookie.",
-      "Make sure you are signed in at https://www.perplexity.ai, then copy a request whose cookies include `__Secure-next-auth.session-token`.",
+      "Make sure you are signed in at https://www.perplexity.ai, then copy a request whose cookies include `__Secure-pplx.session.<account-id>`.",
       "Copy as cURL from a `perplexity_ask` request usually works best.",
     ].join(" ");
   }
@@ -195,8 +210,8 @@ export function browserLoginInstructions(): string {
     "4. Right-click a www.perplexity.ai request → Copy → Copy as cURL.",
     "5. Paste the copied cURL command here.",
     "",
-    "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-next-auth.session-token.",
+    "The copied text must include -b, --cookie, or Cookie:, and should include __Secure-pplx.session.<account-id>.",
     "If it does not, copy a different www.perplexity.ai request, preferably perplexity_ask.",
-    "Alternatives: paste the request Cookie header, or paste the __Secure-next-auth.session-token value.",
+    "Alternatives: paste the request Cookie header, or paste the __Secure-pplx.session.<account-id> cookie value.",
   ].join("\n");
 }
